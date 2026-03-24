@@ -30,6 +30,63 @@ Copy `.env.example` to `.env` and set:
 - `GROQ_API_KEY`
 - `CRON_SECRET`
 
+## Phase 1 Deployment
+
+Apply these Supabase migrations in order:
+
+1. `supabase/migrations/001_create_articles_table.sql`
+2. `supabase/migrations/002_create_missions_table.sql`
+3. `supabase/migrations/003_harden_phase1_pipeline.sql`
+4. `supabase/migrations/004_phase1_observability_and_retries.sql`
+
+After the migrations are applied, Phase 1 is operational through the configured Vercel cron jobs in `vercel.json`:
+
+- `/api/cron/ingest`
+- `/api/cron/classify`
+
+Minimum production validation for Phase 1:
+
+```sql
+select count(*) from ingestion_runs order by ran_at desc;
+select count(*) from classification_runs order by ran_at desc;
+select id, status, category, classification_confidence, classification_method, review_status, retry_count from fraud_articles order by id desc limit 20;
+```
+
+Success criteria to verify against the SRS:
+
+- each daily ingestion run inserts at least 5 new relevant articles
+- classified articles receive structured output with 3-6 clues
+- low-confidence or heuristic classifications land in `needs_review`
+- articles only move to `failed` after 3 unsuccessful classification attempts
+
+## Phase 1 Accuracy Evaluation
+
+The SRS target of `>85% classification accuracy` must be measured against labeled examples. Use the local workflow below:
+
+```sh
+npm run eval:phase1:export -- 25
+```
+
+This writes a review file under `tmp/phase1-eval-sample-*.json`. For each record:
+
+- fill `review.actual_category` with the true category
+- optionally set `review.is_prediction_correct`
+- optionally add `review.reviewer_notes`
+
+Then score the labeled file:
+
+```sh
+npm run eval:phase1:score -- tmp/phase1-eval-sample-YYYY-MM-DDTHH-MM-SS-sssZ.json
+```
+
+The evaluator reports:
+
+- overall accuracy
+- whether the `>85%` SRS target was met
+- per-category accuracy
+- a confusion summary
+- auto-approved accuracy for the highest-confidence subset
+
 ## Ralph Loop for Antigravity
 
 This repo is prepared for the `Ralph Loop for Antigravity` extension with:

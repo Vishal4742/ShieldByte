@@ -2,36 +2,16 @@
 	import Hero from '$lib/components/home/Hero.svelte';
 	import TrainingDeck from '$lib/components/home/TrainingDeck.svelte';
 	import ThreatCard from '$lib/components/home/ThreatCard.svelte';
-	import type { ThreatArticle } from '$lib/types/threat.js';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
-	const categoryLabels: Record<string, string> = {
-		UPI_fraud: 'UPI Fraud',
-		KYC_fraud: 'KYC Fraud',
-		lottery_fraud: 'Lottery Fraud',
-		job_scam: 'Job Scam',
-		investment_fraud: 'Investment Fraud',
-		customer_support_scam: 'Support Scam'
-	};
-
-	const categoryBreakdown = $derived.by(
-		(): Array<[string, number]> =>
-			Array.from(
-				data.articles.reduce((counts: Map<string, number>, article: ThreatArticle) => {
-					const label = categoryLabels[article.category] ?? article.category;
-					counts.set(label, (counts.get(label) ?? 0) + 1);
-					return counts;
-				}, new Map<string, number>())
-			)
-	);
 </script>
 
 <svelte:head>
-	<title>ShieldByte | Live Scam Intelligence</title>
+	<title>ShieldByte | Threat Training Console</title>
 	<meta
 		name="description"
-		content="ShieldByte transforms live cyber fraud reporting into scam intelligence and training-ready threat signals."
+		content="ShieldByte helps people review scam cases and practice spotting fraud signals through a simple training console."
 	/>
 	<link rel="preconnect" href="https://fonts.googleapis.com" />
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
@@ -43,103 +23,60 @@
 
 <div class="shell">
 	<div class="shell__grain"></div>
+	<div class="shell__glow shell__glow--left"></div>
+	<div class="shell__glow shell__glow--right"></div>
 
 	<header class="masthead">
-		<div>
+		<div class="masthead__brand">
 			<p class="masthead__label">ShieldByte</p>
-			<span class="masthead__meta">Threat intelligence dashboard</span>
+			<span class="masthead__meta">Threat training console</span>
 		</div>
 
 		<nav>
-			<a href="#feed">Threat Feed</a>
-			<a href="#mission">Training Console</a>
-			<a href="/api/cron/ingest">Ingest API</a>
+			<a href="#feed">Cases</a>
+			<a href="#mission">Mission</a>
 		</nav>
 	</header>
 
 	<main>
 		<Hero articles={data.articles} />
 
-		<section class="band">
-			<p>Pipeline state</p>
-			<div>
-				<span>News ingestion active</span>
-				<span>AI classification active</span>
-				<span>Supabase-backed case archive</span>
-			</div>
-		</section>
-
-		<section class="overview">
+		<section class="start-strip">
 			<article>
-				<p class="overview__label">Product direction</p>
-				<h2>From fraud reporting to practical scam intelligence.</h2>
-				<p>
-					The interface borrows its atmosphere from the reference posters in the repo root: editorial
-					type, mono metadata, bold contrast, and layered motion. Underneath the styling, the page is
-					still wired to the real ShieldByte ingestion and classification pipeline.
-				</p>
+				<span>Step 1</span>
+				<p>Pick a case from the feed.</p>
 			</article>
-
-			<div class="overview__grid">
-				<div>
-					<span>Core categories</span>
-					<strong>6</strong>
-				</div>
-				<div>
-					<span>Frontend source</span>
-					<strong>Supabase</strong>
-				</div>
-				<div>
-					<span>Primary mode</span>
-					<strong>Signal review</strong>
-				</div>
-			</div>
+			<article>
+				<span>Step 2</span>
+				<p>Read the fraud clues.</p>
+			</article>
+			<article>
+				<span>Step 3</span>
+				<p>Practice in the mission board.</p>
+			</article>
 		</section>
 
-		<section class="content-grid">
-			<section class="feed" id="feed">
-				<div class="section-heading">
-					<p>Recent classified cases</p>
+		<section class="feed-panel" id="feed">
+			<div class="section-heading section-heading--row">
+				<div>
+					<p>Recent cases</p>
 					<h2>Threat feed</h2>
 				</div>
+				<span class="feed-panel__hint">Start with any case below.</span>
+			</div>
 
-				{#if data.articles.length > 0}
-					<div class="feed__grid">
-						{#each data.articles as article, index}
-							<ThreatCard {article} {index} />
-						{/each}
-					</div>
-				{:else}
-					<div class="empty-state">
-						<p>No classified articles yet.</p>
-						<span>
-							Run the ingestion and classification cron endpoints to populate the frontend feed.
-						</span>
-					</div>
-				{/if}
-			</section>
-
-			<aside class="rail">
-				<section class="section-heading rail__stack">
-					<p>Category density</p>
-					<h2>Current mix</h2>
-
-					{#if categoryBreakdown.length > 0}
-						<div class="category-list">
-							{#each categoryBreakdown as [label, count]}
-								<div>
-									<span>{label}</span>
-									<strong>{String(count).padStart(2, '0')}</strong>
-								</div>
-							{/each}
-						</div>
-					{:else}
-						<div class="category-list category-list--empty">
-							No category data available yet.
-						</div>
-					{/if}
-				</section>
-			</aside>
+			{#if data.articles.length > 0}
+				<div class="feed-grid">
+					{#each data.articles as article, index}
+						<ThreatCard {article} {index} />
+					{/each}
+				</div>
+			{:else}
+				<div class="empty-state">
+					<p>No classified articles yet.</p>
+					<span>Run the ingestion and classification cron endpoints to populate the case queue.</span>
+				</div>
+			{/if}
 		</section>
 
 		<TrainingDeck article={data.featuredArticle} mission={data.featuredMission} />
@@ -154,9 +91,9 @@
 	:global(body) {
 		margin: 0;
 		background:
-			radial-gradient(circle at top, rgba(242, 171, 90, 0.16), transparent 28%),
-			radial-gradient(circle at right, rgba(70, 90, 140, 0.16), transparent 24%),
-			#05070b;
+			radial-gradient(circle at top left, rgba(242, 171, 90, 0.13), transparent 22%),
+			radial-gradient(circle at 80% 12%, rgba(126, 170, 255, 0.09), transparent 18%),
+			#04060b;
 		color: #f6f1e8;
 		font-family: 'Cormorant Garamond', serif;
 	}
@@ -164,7 +101,7 @@
 	.shell {
 		--font-display: 'Cormorant Garamond', serif;
 		--font-mono: 'IBM Plex Mono', monospace;
-		--surface-strong: #0b0d12;
+		--surface-strong: #090d14;
 		--line-soft: rgba(255, 255, 255, 0.12);
 		--line-strong: rgba(255, 255, 255, 0.22);
 		--text-strong: rgba(250, 247, 241, 0.96);
@@ -181,12 +118,34 @@
 		position: fixed;
 		inset: 0;
 		pointer-events: none;
-		opacity: 0.18;
+		opacity: 0.15;
 		background-image:
-			linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
-			linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
-		background-size: 48px 48px;
-		mask-image: radial-gradient(circle at center, black, transparent 90%);
+			linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+			linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+		background-size: 52px 52px;
+		mask-image: radial-gradient(circle at center, black, transparent 88%);
+	}
+
+	.shell__glow {
+		position: fixed;
+		width: 32rem;
+		height: 32rem;
+		border-radius: 999px;
+		filter: blur(90px);
+		pointer-events: none;
+		opacity: 0.12;
+	}
+
+	.shell__glow--left {
+		top: -8rem;
+		left: -8rem;
+		background: #f2ab5a;
+	}
+
+	.shell__glow--right {
+		top: 8rem;
+		right: -12rem;
+		background: #5c7fd8;
 	}
 
 	.masthead {
@@ -199,19 +158,17 @@
 		align-items: center;
 		padding: 1rem clamp(1.2rem, 4vw, 3rem);
 		backdrop-filter: blur(18px);
-		background: rgba(5, 7, 11, 0.72);
+		background: rgba(4, 6, 11, 0.72);
 		border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 	}
 
 	.masthead__label,
 	.masthead__meta,
 	nav a,
-	.band p,
-	.band span,
-	.overview__label,
-	.overview__grid span,
+	.start-strip span,
 	.section-heading p,
-	.category-list span {
+	.feed-panel__hint,
+	.empty-state span {
 		font-family: var(--font-mono);
 		font-size: 0.72rem;
 		text-transform: uppercase;
@@ -236,98 +193,74 @@
 	}
 
 	main {
+		position: relative;
+		z-index: 1;
 		padding: 0 clamp(1.2rem, 4vw, 3rem) 4rem;
 	}
 
-	.band {
-		display: flex;
-		justify-content: space-between;
-		gap: 1rem;
-		padding: 1rem 0;
-		border-top: 1px solid var(--line-soft);
-		border-bottom: 1px solid var(--line-soft);
+	.start-strip,
+	.feed-panel,
+	.empty-state {
+		padding: 1.2rem;
+		border: 1px solid var(--line-soft);
+		background:
+			linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01)),
+			rgba(8, 11, 18, 0.82);
 	}
 
-	.band div {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 1rem;
-		justify-content: flex-end;
-	}
-
-	.overview,
-	.content-grid {
-		display: grid;
-		grid-template-columns: minmax(0, 1.2fr) minmax(18rem, 0.8fr);
-		gap: 2rem;
-		margin-top: 2rem;
-	}
-
-	.overview h2,
-	.section-heading h2 {
-		margin: 0.35rem 0 0.8rem;
-		font-family: var(--font-display);
-		font-size: clamp(2.2rem, 5vw, 3.7rem);
-		font-weight: 500;
-		line-height: 0.95;
-	}
-
-	.overview article p:last-child {
-		max-width: 42rem;
-		color: var(--text-soft);
-		line-height: 1.75;
-	}
-
-	.overview__grid {
+	.start-strip {
 		display: grid;
 		grid-template-columns: repeat(3, minmax(0, 1fr));
-		gap: 1rem;
-		align-self: end;
+		gap: 0.9rem;
+		margin-top: 0.8rem;
 	}
 
-	.overview__grid div,
-	.category-list div,
-	.empty-state,
-	.category-list--empty {
+	.start-strip article {
 		padding: 1rem;
-		border: 1px solid var(--line-soft);
+		border: 1px solid rgba(255, 255, 255, 0.08);
 		background: rgba(255, 255, 255, 0.03);
 	}
 
-	.overview__grid strong,
-	.category-list strong {
-		display: block;
-		margin-top: 0.5rem;
+	.start-strip p {
+		margin: 0.55rem 0 0;
+		color: var(--text-strong);
+		line-height: 1.6;
+	}
+
+	.feed-panel {
+		margin-top: 1rem;
+	}
+
+	.section-heading h2 {
+		margin: 0.35rem 0 0;
 		font-family: var(--font-display);
-		font-size: 1.8rem;
-		font-weight: 600;
+		font-size: clamp(2.2rem, 5vw, 3.9rem);
+		font-weight: 500;
+		line-height: 0.94;
 	}
 
-	.feed,
-	.rail {
-		display: grid;
-		gap: 1.2rem;
-		align-content: start;
+	.section-heading--row {
+		display: flex;
+		justify-content: space-between;
+		gap: 1rem;
+		align-items: end;
 	}
 
-	.feed__grid {
+	.feed-panel__hint {
+		max-width: 16rem;
+		line-height: 1.7;
+	}
+
+	.feed-grid {
 		display: grid;
 		grid-template-columns: repeat(2, minmax(0, 1fr));
 		gap: 1rem;
-	}
-
-	.rail__stack {
-		display: grid;
-		gap: 1rem;
-	}
-
-	.category-list {
-		display: grid;
-		gap: 0.75rem;
+		margin-top: 1rem;
 	}
 
 	.empty-state {
 		color: var(--text-soft);
+		margin-top: 1rem;
 	}
 
 	.empty-state p {
@@ -337,31 +270,21 @@
 	}
 
 	@media (max-width: 1100px) {
-		.overview,
-		.content-grid {
+		.start-strip,
+		.feed-grid {
 			grid-template-columns: 1fr;
 		}
 
-		.feed__grid,
-		.overview__grid {
-			grid-template-columns: 1fr;
+		.section-heading--row {
+			flex-direction: column;
+			align-items: flex-start;
 		}
 	}
 
 	@media (max-width: 720px) {
-		.masthead,
-		.band {
+		.masthead {
 			flex-direction: column;
 			align-items: flex-start;
-		}
-
-		nav,
-		.band div {
-			justify-content: flex-start;
-		}
-
-		.feed__grid {
-			grid-template-columns: 1fr;
 		}
 	}
 

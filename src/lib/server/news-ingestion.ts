@@ -14,6 +14,8 @@ import {
 } from './constants.js';
 import { NEWSAPI_KEY } from '$env/static/private';
 import { crawlFraudNews } from './web-scraper.js';
+import { analyzeFraudSignals } from './fraud-signals.js';
+import type { FraudCategory } from './constants.js';
 
 /** Shape of an article before DB insertion */
 export interface RawArticle {
@@ -22,6 +24,60 @@ export interface RawArticle {
 	body: string | null;
 	url: string;
 	published_at: string | null;
+	source_type?: 'newsapi' | 'rss' | 'scraped';
+	category_hint?: FraudCategory | null;
+	relevance_score?: number;
+	matched_keywords?: string[];
+}
+
+function sanitizeText(value: string | null | undefined): string {
+	return (value ?? '').trim().replace(/\s+/g, ' ');
+}
+
+function enrichArticle(
+	article: RawArticle,
+	sourceType: RawArticle['source_type']
+): RawArticle | null {
+	const title = sanitizeText(article.title);
+	const body = sanitizeText(article.body);
+	const analysis = analyzeFraudSignals(title, body);
+
+	if (!title || !article.url || !analysis.isFraudLike) {
+		return null;
+	}
+
+	return {
+		...article,
+		title,
+		body: body || null,
+		url: article.url.trim(),
+		source_type: sourceType,
+		category_hint: analysis.categoryHint,
+		relevance_score: analysis.relevanceScore,
+		matched_keywords: analysis.matchedKeywords
+	};
+}
+
+function deduplicateFetchedArticles(articles: RawArticle[]): RawArticle[] {
+	const seenUrls = new Set<string>();
+	const seenTitleSourceKeys = new Set<string>();
+	const deduplicated: RawArticle[] = [];
+
+	for (const article of articles) {
+		const normalizedUrl = article.url.trim().toLowerCase();
+		const normalizedTitle = sanitizeText(article.title).toLowerCase();
+		const titleSourceKey = `${article.source.toLowerCase()}::${normalizedTitle}`;
+
+		if (seenUrls.has(normalizedUrl) || seenTitleSourceKeys.has(titleSourceKey)) {
+			continue;
+		}
+
+		seenUrls.add(normalizedUrl);
+		seenTitleSourceKeys.add(titleSourceKey);
+		deduplicated.push(article);
+	}
+
+	return deduplicated;
 }
 
 // ─── NewsAPI ────────────────────────────────────────────────
@@ -71,7 +127,9 @@ export async function fetchNewsAPI(): Promise<RawArticle[]> {
 			})
 		);
 
-		return articles.filter((a) => a.url.length > 0);
+		return articles
+			.map((article: RawArticle) => enrichArticle(article, 'newsapi'))
+			.filter((article): article is RawArticle => article !== null);
 	} catch (err) {
 		console.error('[ingest] NewsAPI fetch failed:', err);
 		return [];
@@ -101,7 +159,11 @@ export async function fetchRSSFeeds(): Promise<RawArticle[]> {
 				published_at: item.isoDate ?? null
 			}));
 
-			allArticles.push(...articles.filter((a) => a.url.length > 0));
+			allArticles.push(
+				...articles
+					.map((article: RawArticle) => enrichArticle(article, 'rss'))
+					.filter((article): article is RawArticle => article !== null)
+			);
 		} catch (err) {
 			console.warn(`[ingest] RSS feed failed (${feedUrl}):`, err);
 		}
@@ -118,7 +180,10 @@ export async function fetchRSSFeeds(): Promise<RawArticle[]> {
 export async function deduplicateArticles(articles: RawArticle[]): Promise<RawArticle[]> {
 	if (articles.length === 0) return [];
 
-	const urls = articles.map((a) => a.url);
+	const fetchedArticles = deduplicateFetchedArticles(articles);
+	if (fetchedArticles.length === 0) return [];
+
+	const urls = fetchedArticles.map((a) => a.url);
 
 	const { data: existing, error } = await supabase
 		.from('fraud_articles')
@@ -127,11 +192,11 @@ export async function deduplicateArticles(articles: RawArticle[]): Promise<RawAr
 
 	if (error) {
 		console.error('[ingest] Dedup query failed:', error.message);
-		return articles;
+		return fetchedArticles;
 	}
 
 	const existingUrls = new Set((existing ?? []).map((row: { url: string }) => row.url));
-	return articles.filter((a) => !existingUrls.has(a.url));
+	return fetchedArticles.filter((a) => !existingUrls.has(a.url));
 }
 
 /**
@@ -149,6 +214,10 @@ export async function storeArticles(
 		body: a.body,
 		url: a.url,
 		published_at: a.published_at,
+		category_hint: a.category_hint ?? null,
+		relevance_score: a.relevance_score ?? null,
+		matched_keywords: a.matched_keywords ?? [],
+		ingestion_source_type: a.source_type ?? 'rss',
 		status: 'raw'
 	}));
 
@@ -178,6 +247,8 @@ export async function runIngestionPipeline(): Promise<{
 	duplicates: number;
 	inserted: number;
 	errors: number;
+	targetMet: boolean;
+	runLogged: boolean;
 	sources: { newsapi: number; rss: number; scraped: number };
 }> {
 	console.log('[ingest] Starting ingestion pipeline...');
@@ -189,7 +260,7 @@ export async function runIngestionPipeline(): Promise<{
 		crawlFraudNews()
 	]);
 
-	const allArticles = [...newsArticles, ...rssArticles, ...scrapedArticles];
+	const allArticles = deduplicateFetchedArticles([...newsArticles, ...rssArticles, ...scrapedArticles]);
 	console.log(
 		`[ingest] Fetched ${allArticles.length} articles ` +
 		`(${newsArticles.length} NewsAPI, ${rssArticles.length} RSS, ${scrapedArticles.length} scraped)`
@@ -203,12 +274,36 @@ export async function runIngestionPipeline(): Promise<{
 	// 3. Store
 	const result = await storeArticles(newArticles);
 	console.log(`[ingest] Stored ${result.inserted} articles (${result.errors} errors)`);
+	const targetMet = result.inserted >= 5;
+
+	if (!targetMet) {
+		console.warn(
+			`[ingest] Daily target not met: inserted ${result.inserted} new articles, target is 5.`
+		);
+	}
+
+	const { error: runLogError } = await supabase.from('ingestion_runs').insert({
+		source_newsapi: newsArticles.length,
+		source_rss: rssArticles.length,
+		source_scraped: scrapedArticles.length,
+		total_fetched: allArticles.length,
+		duplicates,
+		inserted: result.inserted,
+		errors: result.errors,
+		target_met: targetMet
+	});
+
+	if (runLogError) {
+		console.error('[ingest] Failed to log ingestion run:', runLogError.message);
+	}
 
 	return {
 		totalFetched: allArticles.length,
 		duplicates,
 		inserted: result.inserted,
 		errors: result.errors,
+		targetMet,
+		runLogged: !runLogError,
 		sources: {
 			newsapi: newsArticles.length,
 			rss: rssArticles.length,

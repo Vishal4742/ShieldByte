@@ -12,6 +12,13 @@ import {
 	type ClassificationResult,
 	normalizeClassificationResult
 } from './extraction.js';
+import {
+	analyzeFraudSignals,
+	buildFallbackClassification,
+	determineReviewStatus,
+	estimateClassificationConfidence
+} from './fraud-signals.js';
+import type { FraudCategory } from './constants.js';
 
 let groqClient: Groq | null = null;
 
@@ -86,44 +93,162 @@ async function classifyArticle(title: string, body: string): Promise<Classificat
 	}
 }
 
-export async function runClassificationPipeline(): Promise<{
+interface ClassificationDecision {
+	result: ClassificationResult;
+	method: 'ai' | 'heuristic';
+	confidence: number;
+	reviewStatus: 'auto_approved' | 'needs_review';
+	model: string | null;
+}
+
+interface ClassificationRunMetrics {
 	classified: number;
+	retried: number;
 	failed: number;
 	total: number;
-}> {
+	autoApproved: number;
+	needsReview: number;
+	usedAI: number;
+	usedHeuristic: number;
+	runLogged: boolean;
+}
+
+async function classifyWithFallback(params: {
+	title: string;
+	body: string;
+	categoryHint: FraudCategory | null;
+	relevanceScore: number;
+}): Promise<ClassificationDecision | null> {
+	const aiResult = await classifyArticle(params.title, params.body);
+
+	if (aiResult) {
+		const confidence = estimateClassificationConfidence({
+			result: aiResult,
+			categoryHint: params.categoryHint,
+			relevanceScore: params.relevanceScore,
+			method: 'ai'
+		});
+
+		return {
+			result: aiResult,
+			method: 'ai',
+			confidence,
+			reviewStatus: determineReviewStatus({
+				confidence,
+				method: 'ai',
+				categoryHint: params.categoryHint,
+				result: aiResult
+			}),
+			model: 'llama-3.3-70b-versatile'
+		};
+	}
+
+	if (!params.categoryHint) {
+		return null;
+	}
+
+	const fallbackResult = buildFallbackClassification({
+		title: params.title,
+		body: params.body,
+		categoryHint: params.categoryHint
+	});
+	const confidence = estimateClassificationConfidence({
+		result: fallbackResult,
+		categoryHint: params.categoryHint,
+		relevanceScore: params.relevanceScore,
+		method: 'heuristic'
+	});
+
+	return {
+		result: fallbackResult,
+		method: 'heuristic',
+		confidence,
+		reviewStatus: 'needs_review',
+		model: null
+	};
+}
+
+export async function runClassificationPipeline(): Promise<ClassificationRunMetrics> {
 	console.log('[classify] Starting classification pipeline...');
 
 	const { data: rawArticles, error } = await supabase
 		.from('fraud_articles')
-		.select('id, title, body')
+		.select('id, title, body, category_hint, relevance_score, retry_count')
 		.eq('status', 'raw')
+		.lt('retry_count', 3)
 		.limit(50);
 
 	if (error) {
 		console.error('[classify] DB fetch error:', error.message);
-		return { classified: 0, failed: 0, total: 0 };
+		return {
+			classified: 0,
+			retried: 0,
+			failed: 0,
+			total: 0,
+			autoApproved: 0,
+			needsReview: 0,
+			usedAI: 0,
+			usedHeuristic: 0,
+			runLogged: false
+		};
 	}
 
 	if (!rawArticles || rawArticles.length === 0) {
 		console.log('[classify] No raw articles to classify.');
-		return { classified: 0, failed: 0, total: 0 };
+		return {
+			classified: 0,
+			retried: 0,
+			failed: 0,
+			total: 0,
+			autoApproved: 0,
+			needsReview: 0,
+			usedAI: 0,
+			usedHeuristic: 0,
+			runLogged: false
+		};
 	}
 
 	console.log(`[classify] Processing ${rawArticles.length} articles...`);
 
 	let classified = 0;
+	let retried = 0;
 	let failed = 0;
+	let autoApproved = 0;
+	let needsReview = 0;
+	let usedAI = 0;
+	let usedHeuristic = 0;
 
 	for (const article of rawArticles) {
-		const result = await classifyArticle(article.title, article.body || '');
+		const heuristicAnalysis = analyzeFraudSignals(article.title, article.body || '');
+		const categoryHint =
+			(typeof article.category_hint === 'string' ? article.category_hint : null) ??
+			heuristicAnalysis.categoryHint;
+		const relevanceScore =
+			typeof article.relevance_score === 'number'
+				? article.relevance_score
+				: heuristicAnalysis.relevanceScore;
+		const decision = await classifyWithFallback({
+			title: article.title,
+			body: article.body || '',
+			categoryHint: categoryHint as FraudCategory | null,
+			relevanceScore
+		});
 
-		if (result) {
+		if (decision) {
 			const { error: updateError } = await supabase
 				.from('fraud_articles')
 				.update({
-					category: result.fraud_type,
-					classification_confidence: 1.0,
-					raw_extraction: result,
+					category: decision.result.fraud_type,
+					category_hint: categoryHint,
+					relevance_score: relevanceScore,
+					classification_confidence: decision.confidence,
+					classification_method: decision.method,
+					classification_model: decision.model,
+					review_status: decision.reviewStatus,
+					retry_count: 0,
+					failed_at: null,
+					last_error: null,
+					raw_extraction: decision.result,
 					status: 'classified'
 				})
 				.eq('id', article.id);
@@ -133,20 +258,72 @@ export async function runClassificationPipeline(): Promise<{
 				failed++;
 			} else {
 				classified++;
+				if (decision.method === 'ai') {
+					usedAI++;
+				} else {
+					usedHeuristic++;
+				}
+				if (decision.reviewStatus === 'auto_approved') {
+					autoApproved++;
+				} else {
+					needsReview++;
+				}
 			}
 		} else {
-			await supabase.from('fraud_articles').update({ status: 'failed' }).eq('id', article.id);
-			failed++;
+			const nextRetryCount =
+				typeof article.retry_count === 'number' ? article.retry_count + 1 : 1;
+			const shouldFail = nextRetryCount >= 3;
+			await supabase
+				.from('fraud_articles')
+				.update({
+					status: shouldFail ? 'failed' : 'raw',
+					category_hint: categoryHint,
+					relevance_score: relevanceScore,
+					review_status: 'needs_review',
+					retry_count: nextRetryCount,
+					failed_at: shouldFail ? new Date().toISOString() : null,
+					last_error: 'Classification returned no valid structured result and no fallback was possible.'
+				})
+				.eq('id', article.id);
+
+			if (shouldFail) {
+				failed++;
+			} else {
+				retried++;
+			}
 		}
 
 		await new Promise((resolve) => setTimeout(resolve, 200));
 	}
 
-	console.log(`[classify] Done: ${classified} classified, ${failed} failed out of ${rawArticles.length}`);
+	console.log(
+		`[classify] Done: ${classified} classified, ${retried} retried, ${failed} failed out of ${rawArticles.length}`
+	);
+
+	const { error: runLogError } = await supabase.from('classification_runs').insert({
+		total_considered: rawArticles.length,
+		classified,
+		retried,
+		failed,
+		auto_approved: autoApproved,
+		needs_review: needsReview,
+		used_ai: usedAI,
+		used_heuristic: usedHeuristic
+	});
+
+	if (runLogError) {
+		console.error('[classify] Failed to log classification run:', runLogError.message);
+	}
 
 	return {
 		classified,
+		retried,
 		failed,
-		total: rawArticles.length
+		total: rawArticles.length,
+		autoApproved,
+		needsReview,
+		usedAI,
+		usedHeuristic,
+		runLogged: !runLogError
 	};
 }

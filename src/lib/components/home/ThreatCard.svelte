@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { ThreatArticle } from '$lib/types/threat.js';
 
-	let { article, index } = $props<{ article: ThreatArticle; index: number }>();
+	let { article, index }: { article: ThreatArticle; index: number } = $props();
 
 	const categoryLabels: Record<string, string> = {
 		UPI_fraud: 'UPI Fraud',
@@ -21,18 +21,34 @@
 			year: 'numeric'
 		}).format(new Date(value));
 	}
+
+	function confidenceBand(value: number | null): string {
+		if (value === null) return 'Review';
+		if (value >= 0.9) return 'Critical';
+		if (value >= 0.75) return 'High';
+		return 'Tracked';
+	}
 </script>
 
 <article class="threat-card">
-	<div class="threat-card__topline">
-		<span>{String(index + 1).padStart(2, '0')}</span>
-		<span>{categoryLabels[article.category] ?? article.category}</span>
+	<div class="threat-card__header">
+		<div class="threat-card__index">
+			<span>Case</span>
+			<strong>{String(index + 1).padStart(2, '0')}</strong>
+		</div>
+
+		<div class="threat-card__status">
+			<span>{confidenceBand(article.confidence)}</span>
+			<strong>{categoryLabels[article.category] ?? article.category}</strong>
+		</div>
 	</div>
 
-	<h3>{article.title}</h3>
-	<p>{article.scenarioSummary}</p>
+	<div class="threat-card__body">
+		<h3>{article.title}</h3>
+		<p>{article.scenarioSummary}</p>
+	</div>
 
-	<div class="threat-card__meta">
+	<div class="threat-card__matrix">
 		<div>
 			<span>Source</span>
 			<strong>{article.source}</strong>
@@ -47,74 +63,108 @@
 		</div>
 	</div>
 
-	<ul>
+	<ul class="threat-card__tags">
 		{#each article.redFlags.slice(0, 3) as redFlag}
 			<li>{redFlag}</li>
 		{/each}
 	</ul>
 
-	<div class="threat-card__actions">
-		<a href={`/articles/${article.id}`} class="threat-card__primary">Open intelligence brief</a>
-		<a href={article.url} target="_blank" rel="noreferrer">Read source report</a>
+	<div class="threat-card__footer">
+		<a href={`/articles/${article.id}`} class="threat-card__primary">Open case</a>
+		<a href={article.url} target="_blank" rel="noreferrer">Source</a>
 	</div>
 </article>
 
 <style>
 	.threat-card {
+		position: relative;
 		display: grid;
 		gap: 1rem;
-		padding: 1.25rem;
+		padding: 1.2rem;
 		border: 1px solid var(--line-soft);
 		background:
-			linear-gradient(180deg, rgba(244, 172, 94, 0.08), rgba(255, 255, 255, 0)),
-			rgba(8, 12, 20, 0.76);
+			linear-gradient(140deg, rgba(242, 171, 90, 0.08), transparent 35%),
+			linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01)),
+			rgba(8, 12, 20, 0.82);
 		min-height: 100%;
+		transition:
+			transform 180ms ease,
+			border-color 180ms ease,
+			box-shadow 180ms ease;
 	}
 
-	.threat-card__topline,
-	.threat-card__meta span,
-	a {
-		font-family: var(--font-mono);
-		font-size: 0.72rem;
-		text-transform: uppercase;
-		letter-spacing: 0.18em;
-		color: var(--text-muted);
+	.threat-card:hover,
+	.threat-card:focus-within {
+		transform: translateY(-2px);
+		border-color: rgba(242, 171, 90, 0.35);
+		box-shadow: 0 18px 40px rgba(0, 0, 0, 0.22);
 	}
 
-	.threat-card__topline {
+	.threat-card__header,
+	.threat-card__matrix,
+	.threat-card__footer {
 		display: flex;
 		justify-content: space-between;
 		gap: 1rem;
-		padding-bottom: 0.9rem;
-		border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+		align-items: flex-start;
 	}
 
-	h3 {
-		font-family: var(--font-display);
-		font-size: 2rem;
-		font-weight: 500;
-		line-height: 0.98;
+	.threat-card__index span,
+	.threat-card__status span,
+	.threat-card__matrix span,
+	.threat-card__footer a {
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		text-transform: uppercase;
+		letter-spacing: 0.18em;
+		color: var(--text-muted);
+		text-decoration: none;
 	}
 
-	p {
-		color: var(--text-soft);
-		line-height: 1.7;
-	}
-
-	.threat-card__meta {
-		display: grid;
-		grid-template-columns: repeat(3, minmax(0, 1fr));
-		gap: 0.8rem;
-	}
-
-	.threat-card__meta strong {
+	.threat-card__index strong,
+	.threat-card__status strong,
+	.threat-card__matrix strong {
 		display: block;
 		margin-top: 0.45rem;
-		font-size: 0.95rem;
-		line-height: 1.4;
+		color: var(--text-strong);
 	}
 
-	ul {
+	.threat-card__index strong {
+		font-family: var(--font-display);
+		font-size: 2rem;
+		line-height: 1;
+	}
+
+	.threat-card__status {
+		text-align: right;
+	}
+
+	.threat-card__status strong {
+		max-width: 10rem;
+		font-size: 0.92rem;
+		line-height: 1.35;
+	}
+
+	.threat-card__body h3 {
+		margin: 0;
+		font-family: var(--font-display);
+		font-size: clamp(1.8rem, 4vw, 2.5rem);
+		font-weight: 500;
+		line-height: 0.96;
+	}
+
+	.threat-card__body p {
+		margin: 0.8rem 0 0;
+		color: var(--text-soft);
+		line-height: 1.75;
+	}
+
+	.threat-card__matrix {
+		display: grid;
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+
+	.threat-card__tags {
 		display: flex;
 		flex-wrap: wrap;
 		gap: 0.65rem;
@@ -123,41 +173,40 @@
 		margin: 0;
 	}
 
-	li {
-		padding: 0.45rem 0.8rem;
-		border-radius: 999px;
-		background: rgba(255, 255, 255, 0.06);
+	.threat-card__tags li {
+		padding: 0.45rem 0.75rem;
+		background: rgba(255, 255, 255, 0.05);
 		color: var(--text-strong);
-		font-size: 0.85rem;
+		font-size: 0.82rem;
 	}
 
-	a {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.6rem;
-		width: fit-content;
-		color: var(--accent-soft);
-		text-decoration: none;
-	}
-
-	.threat-card__actions {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 1rem;
+	.threat-card__footer {
+		border-top: 1px solid rgba(255, 255, 255, 0.08);
+		padding-top: 1rem;
 	}
 
 	.threat-card__primary {
 		color: var(--accent);
 	}
 
-	a:hover,
-	a:focus-visible {
+	.threat-card__footer a:hover,
+	.threat-card__footer a:focus-visible {
 		color: var(--text-strong);
 	}
 
 	@media (max-width: 720px) {
-		.threat-card__meta {
+		.threat-card__header,
+		.threat-card__footer {
+			flex-direction: column;
+		}
+
+		.threat-card__status {
+			text-align: left;
+		}
+
+		.threat-card__matrix {
 			grid-template-columns: 1fr;
+			gap: 0.85rem;
 		}
 	}
 </style>

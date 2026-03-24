@@ -56,79 +56,93 @@
 
 	const selectedCount = $derived(selected.length);
 	const totalSignals = $derived(checklistItems.length);
+	const accuracy = $derived(totalSignals > 0 ? Math.round((selectedCount / totalSignals) * 100) : 0);
+	const score = $derived((selectedCount * 150) + (hasSubmitted ? 250 : 0));
 	const messageLines = $derived(
 		(mission?.messageBody || article?.scenarioSummary || '')
 			.split(/\n+/)
 			.map((line) => line.trim())
 			.filter((line) => line.length > 0)
 	);
+	const missionType = $derived(mission ? mission.simulationType.replace('_', ' ') : 'Classifier drill');
 </script>
 
-<section class="training-deck" id="mission">
-	<div class="training-deck__intro">
+<section class="training-app" id="mission">
+	<div class="training-app__header">
 		<div>
-			<p class="training-deck__eyebrow">Interactive training deck</p>
-			<h2>Spot the scam signals before the explanation appears.</h2>
+			<p class="training-app__eyebrow">Mission board</p>
+			<h2>Play the case like a fraud analyst.</h2>
 		</div>
 
-		<div class="training-deck__summary">
-			<div>
-				<span>Featured case</span>
-				<strong>{article?.title ?? 'No featured article available'}</strong>
-			</div>
-			<div>
-				<span>Exercise mode</span>
-				<strong>{mission ? 'Simulated message' : 'Classifier clue drill'}</strong>
-			</div>
-			<div>
-				<span>Signals to find</span>
-				<strong>{String(totalSignals).padStart(2, '0')}</strong>
-			</div>
+		<div class="training-app__stats">
+			<article>
+				<span>Mission score</span>
+				<strong>{String(score).padStart(4, '0')}</strong>
+			</article>
+			<article>
+				<span>Signals marked</span>
+				<strong>{String(selectedCount).padStart(2, '0')} / {String(totalSignals).padStart(2, '0')}</strong>
+			</article>
+			<article>
+				<span>Read accuracy</span>
+				<strong>{String(accuracy).padStart(2, '0')}%</strong>
+			</article>
 		</div>
 	</div>
 
 	{#if article}
-		<div class="training-stage">
-			<section class="mission-sheet">
-				<div class="mission-sheet__header">
+		<div class="training-app__grid">
+			<section class="training-slate training-slate--intel">
+				<div class="slate-heading">
 					<div>
-						<p>Scenario file</p>
-						<h3>{mission ? mission.simulationType.replace('_', ' ') : 'Classifier training brief'}</h3>
+						<p>Case intake</p>
+						<h3>{article.title}</h3>
 					</div>
+					<a href={`/articles/${article.id}`}>Full brief</a>
+				</div>
 
-					<div class="mission-sheet__meta">
-						<div>
-							<span>Sender</span>
-							<strong>{mission?.sender ?? article.source}</strong>
-						</div>
-						<div>
-							<span>Difficulty</span>
-							<strong>{mission?.difficulty ?? 'guided'}</strong>
-						</div>
+				<div class="signal-pill-row">
+					<span>{missionType}</span>
+					<span>{mission?.difficulty ?? 'guided'}</span>
+					<span>{mission?.sender ?? article.source}</span>
+				</div>
+
+				<div class="message-window">
+					<header>
+						<span>Incoming scenario</span>
+						<strong>{mission ? 'Live simulation' : 'Classifier narrative'}</strong>
+					</header>
+
+					<div class="message-window__body">
+						{#if mission && messageLines.length > 0}
+							{#each messageLines as line}
+								<p>{line}</p>
+							{/each}
+						{:else}
+							<p>{article.scenarioSummary}</p>
+							<p>{article.body}</p>
+						{/if}
 					</div>
 				</div>
 
-				<div class="mission-sheet__body">
-					{#if mission && messageLines.length > 0}
-						{#each messageLines as line}
-							<p>{line}</p>
-						{/each}
-					{:else}
-						<p>{article.scenarioSummary}</p>
-						<p>{article.body}</p>
-					{/if}
-				</div>
-
-				<div class="mission-sheet__footer">
-					<span>Read first. Mark each signal you would challenge before acting.</span>
-					<a href={`/articles/${article.id}`}>Open full intelligence brief</a>
+				<div class="intel-strip">
+					<div>
+						<span>Profile</span>
+						<p>{article.victimProfile}</p>
+					</div>
+					<div>
+						<span>Defensive tip</span>
+						<p>{mission?.tip ?? article.tip}</p>
+					</div>
 				</div>
 			</section>
 
-			<section class="training-console">
-				<div class="training-console__header">
-					<p>Checklist exercise</p>
-					<h3>Mark the warning signs you can identify.</h3>
+			<section class="training-slate training-slate--control">
+				<div class="slate-heading">
+					<div>
+						<p>Action grid</p>
+						<h3>Mark every scam signal you can justify.</h3>
+					</div>
 				</div>
 
 				<div class="signal-grid">
@@ -140,27 +154,34 @@
 							onclick={() => toggleSelection(item.id)}
 						>
 							<span>{item.label}</span>
-							<strong>{selected.includes(item.id) ? 'Marked' : 'Tap to mark'}</strong>
+							<strong>{selected.includes(item.id) ? 'Locked in' : 'Mark signal'}</strong>
 						</button>
 					{/each}
 				</div>
 
-				<div class="training-console__actions">
-					<div>
-						<span>Marked signals</span>
-						<strong>{String(selectedCount).padStart(2, '0')} / {String(totalSignals).padStart(2, '0')}</strong>
+				<div class="control-row">
+					<div class="progress-module">
+						<span>Session state</span>
+						<strong>{hasSubmitted ? 'Reviewed' : 'Active'}</strong>
+						<p>Select the signals you would stop and verify before responding.</p>
 					</div>
 
-					<div class="training-console__buttons">
-						<button type="button" class="action-primary" onclick={reviewAnswers}>Review answers</button>
-						<button type="button" class="action-secondary" onclick={resetExercise}>Reset</button>
+					<div class="action-stack">
+						<button type="button" class="action-primary" onclick={reviewAnswers}>Reveal evaluation</button>
+						<button type="button" class="action-secondary" onclick={resetExercise}>Restart run</button>
 					</div>
 				</div>
 
 				{#if hasSubmitted}
-					<div class="answer-board">
-						<p>Answer key</p>
-						<div class="answer-board__grid">
+					<div class="evaluation-board">
+						<div class="slate-heading slate-heading--compact">
+							<div>
+								<p>Evaluation log</p>
+								<h3>Why each signal matters</h3>
+							</div>
+						</div>
+
+						<div class="evaluation-board__grid">
 							{#each checklistItems as item, index}
 								<article>
 									<div>
@@ -174,36 +195,30 @@
 						</div>
 					</div>
 				{/if}
-
-				<div class="training-console__tip">
-					<span>Defensive reminder</span>
-					<p>{mission?.tip ?? article.tip}</p>
-				</div>
 			</section>
 		</div>
 	{:else}
 		<div class="training-empty">
-			No classified article is available yet. Run ingestion and classification first to enable the training deck.
+			No classified article is available yet. Run ingestion and classification first to unlock the mission board.
 		</div>
 	{/if}
 </section>
 
 <style>
-	.training-deck {
+	.training-app {
 		display: grid;
-		gap: 1.4rem;
-		margin-top: 2.5rem;
+		gap: 1.2rem;
+		margin-top: 2.2rem;
 	}
 
-	.training-deck__eyebrow,
-	.training-deck__summary span,
-	.mission-sheet__header p,
-	.mission-sheet__meta span,
-	.training-console__header p,
-	.training-console__actions span,
-	.answer-board p,
-	.answer-board span,
-	.training-console__tip span,
+	.training-app__eyebrow,
+	.training-app__stats span,
+	.slate-heading p,
+	.signal-pill-row span,
+	.message-window header span,
+	.intel-strip span,
+	.progress-module span,
+	.evaluation-board span,
 	.training-empty {
 		font-family: var(--font-mono);
 		font-size: 0.72rem;
@@ -212,159 +227,170 @@
 		color: var(--text-muted);
 	}
 
-	.training-deck__intro {
+	.training-app__header {
 		display: grid;
-		grid-template-columns: minmax(0, 1.2fr) minmax(18rem, 0.8fr);
-		gap: 1.25rem;
+		grid-template-columns: minmax(0, 1.05fr) minmax(22rem, 0.95fr);
+		gap: 1rem;
 		align-items: end;
 	}
 
-	.training-deck__intro h2,
-	.training-console__header h3 {
-		margin: 0.45rem 0 0;
+	.training-app__header h2,
+	.slate-heading h3 {
+		margin: 0.4rem 0 0;
 		font-family: var(--font-display);
-		font-size: clamp(2.4rem, 6vw, 4.6rem);
+		font-size: clamp(2.5rem, 6vw, 4.7rem);
 		font-weight: 500;
 		line-height: 0.92;
 	}
 
-	.training-deck__summary {
+	.training-app__stats {
 		display: grid;
 		grid-template-columns: repeat(3, minmax(0, 1fr));
-		gap: 1rem;
+		gap: 0.9rem;
 	}
 
-	.training-deck__summary div,
+	.training-app__stats article,
 	.training-empty {
 		padding: 1rem;
 		border: 1px solid var(--line-soft);
-		background: rgba(255, 255, 255, 0.03);
+		background:
+			linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01)),
+			rgba(10, 13, 21, 0.82);
 	}
 
-	.training-deck__summary strong {
+	.training-app__stats strong {
 		display: block;
 		margin-top: 0.55rem;
-		font-size: 1rem;
-		line-height: 1.4;
+		font-family: var(--font-display);
+		font-size: 2.1rem;
+		line-height: 1;
 	}
 
-	.training-stage {
+	.training-app__grid {
 		display: grid;
-		grid-template-columns: minmax(0, 1.05fr) minmax(22rem, 0.95fr);
-		gap: 1.2rem;
-		align-items: start;
+		grid-template-columns: minmax(0, 1.08fr) minmax(24rem, 0.92fr);
+		gap: 1rem;
 	}
 
-	.mission-sheet,
-	.training-console {
+	.training-slate {
 		position: relative;
-		padding: 1.4rem;
+		padding: 1.3rem;
 		border: 1px solid var(--line-soft);
 		background:
-			radial-gradient(circle at top right, rgba(242, 171, 90, 0.14), transparent 30%),
+			radial-gradient(circle at top right, rgba(242, 171, 90, 0.14), transparent 28%),
 			linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01)),
-			rgba(7, 10, 16, 0.85);
+			rgba(9, 12, 19, 0.86);
+		overflow: hidden;
 	}
 
-	.mission-sheet::before,
-	.training-console::before {
+	.training-slate::before {
 		content: '';
 		position: absolute;
-		inset: 0.75rem;
+		inset: 0.85rem;
 		border: 1px dashed rgba(255, 255, 255, 0.08);
 		pointer-events: none;
 	}
 
-	.mission-sheet__header,
-	.training-console__actions,
-	.answer-board__grid article div {
+	.slate-heading,
+	.message-window header,
+	.control-row,
+	.evaluation-board__grid article div {
 		display: flex;
 		justify-content: space-between;
 		gap: 1rem;
+		align-items: flex-start;
 	}
 
-	.mission-sheet__header h3 {
-		margin: 0.45rem 0 0;
-		font-family: var(--font-display);
-		font-size: clamp(2rem, 4vw, 3.2rem);
-		font-weight: 500;
-		line-height: 0.95;
-	}
-
-	.mission-sheet__meta {
-		display: grid;
-		gap: 0.85rem;
-		text-align: right;
-	}
-
-	.mission-sheet__meta strong,
-	.training-console__actions strong {
-		display: block;
-		margin-top: 0.45rem;
-		font-size: 0.95rem;
-		color: var(--text-strong);
-	}
-
-	.mission-sheet__body {
-		display: grid;
-		gap: 0.95rem;
-		margin: 1.4rem 0;
-		padding: 1.25rem;
-		background:
-			linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
-			rgba(255, 255, 255, 0.03);
-		border: 1px solid rgba(255, 255, 255, 0.09);
-		box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
-	}
-
-	.mission-sheet__body p,
-	.answer-board__grid article p,
-	.training-console__tip p,
-	.training-empty {
-		margin: 0;
-		color: var(--text-soft);
-		line-height: 1.85;
-	}
-
-	.mission-sheet__footer {
-		display: flex;
-		flex-wrap: wrap;
-		justify-content: space-between;
-		gap: 1rem;
-		align-items: center;
-	}
-
-	.mission-sheet__footer span,
-	.mission-sheet__footer a {
+	.slate-heading a {
 		font-family: var(--font-mono);
-		font-size: 0.74rem;
-		letter-spacing: 0.14em;
+		font-size: 0.72rem;
 		text-transform: uppercase;
-		color: var(--text-muted);
+		letter-spacing: 0.16em;
+		color: var(--accent-soft);
 		text-decoration: none;
 	}
 
-	.signal-grid,
-	.answer-board__grid {
+	.signal-pill-row {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.65rem;
+		margin-top: 1rem;
+	}
+
+	.signal-pill-row span {
+		padding: 0.45rem 0.7rem;
+		border: 1px solid rgba(255, 255, 255, 0.08);
+		background: rgba(255, 255, 255, 0.04);
+		color: var(--text-strong);
+	}
+
+	.message-window {
+		margin-top: 1rem;
+		border: 1px solid rgba(255, 255, 255, 0.08);
+		background: rgba(5, 8, 14, 0.65);
+	}
+
+	.message-window header {
+		padding: 0.9rem 1rem;
+		border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+	}
+
+	.message-window header strong {
+		color: var(--text-strong);
+		font-size: 0.95rem;
+	}
+
+	.message-window__body {
+		display: grid;
+		gap: 0.9rem;
+		padding: 1rem;
+		max-height: 24rem;
+		overflow: auto;
+	}
+
+	.message-window__body p,
+	.intel-strip p,
+	.progress-module p,
+	.evaluation-board__grid article p,
+	.training-empty {
+		margin: 0;
+		color: var(--text-soft);
+		line-height: 1.8;
+	}
+
+	.intel-strip {
 		display: grid;
 		grid-template-columns: repeat(2, minmax(0, 1fr));
 		gap: 0.9rem;
+		margin-top: 1rem;
 	}
 
-	.signal-grid {
-		margin: 1.4rem 0;
+	.intel-strip div,
+	.progress-module,
+	.evaluation-board__grid article {
+		padding: 1rem;
+		border: 1px solid rgba(255, 255, 255, 0.08);
+		background: rgba(255, 255, 255, 0.03);
 	}
 
-	.signal-grid button,
-	.answer-board__grid article {
+	.intel-strip p {
+		margin-top: 0.55rem;
+	}
+
+	.signal-grid,
+	.evaluation-board__grid {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 0.8rem;
+		margin-top: 1rem;
+	}
+
+	.signal-grid button {
 		padding: 1rem;
 		border: 1px solid rgba(255, 255, 255, 0.1);
 		background: rgba(255, 255, 255, 0.03);
 		color: var(--text-strong);
 		text-align: left;
-	}
-
-	.signal-grid button {
 		cursor: pointer;
 		transition:
 			transform 160ms ease,
@@ -376,12 +402,8 @@
 	.signal-grid button:focus-visible,
 	.signal-grid button.selected {
 		transform: translateY(-1px);
-		border-color: rgba(242, 171, 90, 0.55);
+		border-color: rgba(242, 171, 90, 0.52);
 		background: rgba(242, 171, 90, 0.08);
-	}
-
-	.signal-grid button.revealed {
-		border-color: rgba(255, 255, 255, 0.18);
 	}
 
 	.signal-grid span,
@@ -391,23 +413,44 @@
 
 	.signal-grid span {
 		font-family: var(--font-display);
-		font-size: 1.15rem;
-		line-height: 1.1;
+		font-size: 1.12rem;
+		line-height: 1.08;
 	}
 
 	.signal-grid strong {
 		margin-top: 0.7rem;
 		font-family: var(--font-mono);
-		font-size: 0.7rem;
+		font-size: 0.68rem;
 		text-transform: uppercase;
 		letter-spacing: 0.16em;
 		color: var(--text-muted);
 	}
 
-	.training-console__buttons {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.8rem;
+	.control-row {
+		margin-top: 1rem;
+		align-items: stretch;
+	}
+
+	.progress-module {
+		flex: 1;
+	}
+
+	.progress-module strong {
+		display: block;
+		margin-top: 0.5rem;
+		font-family: var(--font-display);
+		font-size: 1.7rem;
+		line-height: 1;
+	}
+
+	.progress-module p {
+		margin-top: 0.7rem;
+	}
+
+	.action-stack {
+		display: grid;
+		gap: 0.75rem;
+		min-width: 12rem;
 	}
 
 	.action-primary,
@@ -433,43 +476,40 @@
 		color: var(--text-strong);
 	}
 
-	.answer-board {
-		display: grid;
-		gap: 0.95rem;
-		margin-top: 1.3rem;
-		padding-top: 1.3rem;
+	.evaluation-board {
+		margin-top: 1rem;
+		padding-top: 1rem;
 		border-top: 1px solid rgba(255, 255, 255, 0.08);
 	}
 
-	.answer-board__grid article h4 {
+	.slate-heading--compact h3 {
+		font-size: clamp(1.8rem, 4vw, 2.8rem);
+	}
+
+	.evaluation-board__grid article h4 {
 		margin: 0.8rem 0 0.55rem;
-		font-size: 1.05rem;
+		font-size: 1rem;
 		line-height: 1.35;
 	}
 
-	.training-console__tip {
-		margin-top: 1.3rem;
-		padding: 1rem;
-		background: rgba(255, 255, 255, 0.03);
-		border: 1px solid rgba(255, 255, 255, 0.08);
-	}
-
 	@media (max-width: 1100px) {
-		.training-deck__intro,
-		.training-stage,
-		.training-deck__summary,
+		.training-app__header,
+		.training-app__stats,
+		.training-app__grid,
+		.intel-strip,
 		.signal-grid,
-		.answer-board__grid {
+		.evaluation-board__grid {
 			grid-template-columns: 1fr;
 		}
 
-		.mission-sheet__header,
-		.training-console__actions {
+		.slate-heading,
+		.message-window header,
+		.control-row {
 			flex-direction: column;
 		}
 
-		.mission-sheet__meta {
-			text-align: left;
+		.action-stack {
+			min-width: 0;
 		}
 	}
 </style>

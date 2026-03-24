@@ -23,8 +23,8 @@ export const ClassificationSchema = z.object({
 	channel: z.enum(CHANNELS),
 	scenario_summary: z.string(),
 	victim_profile: z.string(),
-	clues: z.array(ClueSchema).min(1).max(6),
-	red_flags: z.array(z.string()).min(1).max(5),
+	clues: z.array(ClueSchema).min(3).max(6),
+	red_flags: z.array(z.string()).min(3).max(5),
 	tip: z.string()
 });
 
@@ -115,22 +115,12 @@ export function normalizeClassificationResult(raw: unknown): ClassificationResul
 			),
 			'General digital users exposed to high-pressure payment, identity, or authority-based scams.'
 		),
-		clues:
-			normalizedClues.length > 0
-				? normalizedClues
-				: [
-						{
-							clue_text: 'Review this suspicious message pattern carefully.',
-							type: 'urgency' as const,
-							explanation:
-								'This pattern should be verified carefully before you trust the message.'
-						}
-					],
+		clues: normalizedClues,
 		red_flags: (() => {
 			const flags = asStringArray(candidate.red_flags).map((entry) =>
 				prefersEnglish(entry, 'Unexpected pressure or suspicious contact details')
 			);
-			return flags.length > 0 ? flags : ['Unexpected pressure or suspicious contact details'];
+			return flags;
 		})(),
 		tip: prefersEnglish(
 			asString(

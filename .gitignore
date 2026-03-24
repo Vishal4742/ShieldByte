@@ -30,3 +30,6 @@ docs/tasks/prompt.md
 # Local design exports and specs
 design-*.html
 ShieldByte_SRS_v4.md
+
+# Local evaluation outputs
+tmp/

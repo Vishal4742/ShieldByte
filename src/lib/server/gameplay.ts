@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { supabase } from './supabase.js';
+import { resolveLivesState, MAX_LIVES, LIFE_REGEN_MS } from '$lib/gameplay/engine.js';
 
 const ATTEMPT_OUTCOMES = ['success', 'timeout', 'failed'] as const;
 
@@ -140,7 +141,9 @@ export async function recordMissionAttempt(payload: MissionAttemptPayload) {
 			streak_days: nextStreakDays,
 			rank: nextRank,
 			last_mission_at: now.toISOString(),
-			updated_at: now.toISOString()
+			updated_at: now.toISOString(),
+			lives: payload.lives_remaining,
+			lives_updated_at: now.toISOString()
 		},
 		{ onConflict: 'user_id' }
 	);
@@ -157,6 +160,81 @@ export async function recordMissionAttempt(payload: MissionAttemptPayload) {
 			streakDays: nextStreakDays,
 			rank: nextRank,
 			lastMissionAt: now.toISOString()
+		},
+		lives: {
+			lives: payload.lives_remaining,
+			lastUpdatedAt: now.getTime(),
+			nextLifeInMs: payload.lives_remaining >= MAX_LIVES ? null : LIFE_REGEN_MS
 		}
 	};
+}
+
+// ─── Server-side Lives ──────────────────────────────────────
+
+export async function getOrInitLives(userId: string) {
+	const now = Date.now();
+
+	const { data, error } = await supabase
+		.from('user_stats')
+		.select('lives, lives_updated_at')
+		.eq('user_id', userId)
+		.maybeSingle<{ lives: number; lives_updated_at: string }>();
+
+	if (error) {
+		throw new Error(`Failed to load lives: ${error.message}`);
+	}
+
+	if (!data) {
+		// First-time player: create row with full lives
+		const { error: insertErr } = await supabase.from('user_stats').upsert(
+			{
+				user_id: userId,
+				lives: MAX_LIVES,
+				lives_updated_at: new Date(now).toISOString()
+			},
+			{ onConflict: 'user_id' }
+		);
+
+		if (insertErr) {
+			throw new Error(`Failed to init lives: ${insertErr.message}`);
+		}
+
+		return resolveLivesState({ lives: MAX_LIVES, lastUpdatedAt: now }, now);
+	}
+
+	const lastUpdatedAt = new Date(data.lives_updated_at).getTime();
+	const resolved = resolveLivesState({ lives: data.lives, lastUpdatedAt }, now);
+
+	// If regeneration happened, persist the new state
+	if (resolved.lives !== data.lives) {
+		await supabase
+			.from('user_stats')
+			.update({
+				lives: resolved.lives,
+				lives_updated_at: new Date(resolved.lastUpdatedAt).toISOString()
+			})
+			.eq('user_id', userId);
+	}
+
+	return resolved;
+}
+
+export async function updateServerLives(userId: string, livesRemaining: number) {
+	const clamped = Math.min(MAX_LIVES, Math.max(0, livesRemaining));
+	const now = new Date();
+
+	const { error } = await supabase.from('user_stats').upsert(
+		{
+			user_id: userId,
+			lives: clamped,
+			lives_updated_at: now.toISOString()
+		},
+		{ onConflict: 'user_id' }
+	);
+
+	if (error) {
+		throw new Error(`Failed to update lives: ${error.message}`);
+	}
+
+	return resolveLivesState({ lives: clamped, lastUpdatedAt: now.getTime() }, now.getTime());
 }

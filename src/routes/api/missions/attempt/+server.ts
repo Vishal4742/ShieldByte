@@ -23,7 +23,8 @@ export const POST: RequestHandler = async ({ request }) => {
 		return json({
 			success: true,
 			attempt_id: result.attemptId,
-			profile: result.profile
+			profile: result.profile,
+			lives: result.lives
 		});
 	} catch (err) {
 		console.error('[missions/attempt] Failed to record mission attempt:', err);

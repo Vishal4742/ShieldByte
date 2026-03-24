@@ -5,12 +5,10 @@
 		buildMissionResultSummary,
 		buildMissionSegments,
 		consumeLife,
-		LIVES_STORAGE_KEY,
+		resolveLivesState,
 		LOW_TIME_THRESHOLD_SECONDS,
 		MISSION_DURATION_SECONDS,
 		PLAYER_ID_STORAGE_KEY,
-		parseLivesState,
-		serializeLivesState,
 		getOrCreatePlayerId,
 		type LivesState,
 		type PlayerStatsSnapshot,
@@ -71,17 +69,16 @@
 
 	function persistLives(nextState: LivesState) {
 		livesState = nextState;
-		if (!browser) {
+		if (!browser || !playerId) {
 			return;
 		}
 
-		localStorage.setItem(
-			LIVES_STORAGE_KEY,
-			serializeLivesState({
-				lives: nextState.lives,
-				lastUpdatedAt: nextState.lastUpdatedAt
-			})
-		);
+		// Fire-and-forget server sync (non-blocking for UI responsiveness)
+		void fetch('/api/lives', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ user_id: playerId, lives_remaining: nextState.lives })
+		}).catch((err) => console.warn('[GameplayEngine] Lives sync failed:', err));
 	}
 
 	function startTimers() {
@@ -107,7 +104,11 @@
 				return;
 			}
 
-			persistLives(parseLivesState(localStorage.getItem(LIVES_STORAGE_KEY), Date.now()));
+			// Client-side regen countdown (non-authoritative, for display smoothness)
+			livesState = resolveLivesState(
+				{ lives: livesState.lives, lastUpdatedAt: livesState.lastUpdatedAt },
+				Date.now()
+			);
 		}, 1000);
 	}
 
@@ -207,9 +208,13 @@
 
 			const payload = (await response.json()) as {
 				profile?: PlayerStatsSnapshot;
+				lives?: LivesState;
 			};
 
 			profileSnapshot = payload.profile ?? null;
+			if (payload.lives) {
+				livesState = payload.lives;
+			}
 			saveState = 'saved';
 			saveMessage = payload.profile
 				? `Saved to ${payload.profile.rank}. Total XP: ${payload.profile.totalXp}.`
@@ -255,13 +260,22 @@
 		}
 	}
 
-	function restartMission() {
-		if (!browser) {
+	async function restartMission() {
+		if (!browser || !playerId) {
 			return;
 		}
 
-		const refreshedLives = parseLivesState(localStorage.getItem(LIVES_STORAGE_KEY), Date.now());
-		persistLives(refreshedLives);
+		// Fetch server truth before restarting
+		try {
+			const res = await fetch(`/api/lives?user_id=${encodeURIComponent(playerId)}`);
+			if (res.ok) {
+				const serverLives = (await res.json()) as LivesState;
+				livesState = serverLives;
+			}
+		} catch (err) {
+			console.warn('[GameplayEngine] Failed to fetch server lives on restart:', err);
+		}
+
 		foundIds = [];
 		wrongTaps = 0;
 		secondsRemaining = MISSION_DURATION_SECONDS;
@@ -271,14 +285,14 @@
 		saveMessage = 'Mission result will save when the run ends.';
 		profileSnapshot = null;
 		flashState = 'idle';
-		feedbackTitle = refreshedLives.lives > 0 ? 'Mission ready' : 'No shields available';
+		feedbackTitle = livesState.lives > 0 ? 'Mission ready' : 'No shields available';
 		feedbackBody =
-			refreshedLives.lives > 0
+			livesState.lives > 0
 				? 'Tap the scam clues inside the message before the clock runs out.'
 				: 'Wait for a shield to regenerate before starting another run.';
-		missionState = refreshedLives.lives > 0 ? 'active' : 'ready';
+		missionState = livesState.lives > 0 ? 'active' : 'ready';
 
-		if (refreshedLives.lives > 0) {
+		if (livesState.lives > 0) {
 			startTimers();
 		}
 	}
@@ -300,18 +314,30 @@
 			return;
 		}
 
-		const nextLives = parseLivesState(localStorage.getItem(LIVES_STORAGE_KEY), Date.now());
 		playerId = getOrCreatePlayerId(localStorage.getItem(PLAYER_ID_STORAGE_KEY));
 		localStorage.setItem(PLAYER_ID_STORAGE_KEY, playerId);
-		persistLives(nextLives);
-		missionState = nextLives.lives > 0 ? 'active' : 'ready';
-		feedbackTitle = nextLives.lives > 0 ? 'Mission live' : 'No shields available';
-		feedbackBody =
-			nextLives.lives > 0
-				? 'Tap the suspicious text fragments directly inside the message bubble.'
-				: 'You are out of shields. Wait for a shield to regenerate or come back later.';
 
-		startTimers();
+		// Load lives from server (source of truth)
+		void (async () => {
+			try {
+				const res = await fetch(`/api/lives?user_id=${encodeURIComponent(playerId!)}`);
+				if (res.ok) {
+					const serverLives = (await res.json()) as LivesState;
+					livesState = serverLives;
+				}
+			} catch (err) {
+				console.warn('[GameplayEngine] Failed to fetch server lives:', err);
+			}
+
+			missionState = livesState.lives > 0 ? 'active' : 'ready';
+			feedbackTitle = livesState.lives > 0 ? 'Mission live' : 'No shields available';
+			feedbackBody =
+				livesState.lives > 0
+					? 'Tap the suspicious text fragments directly inside the message bubble.'
+					: 'You are out of shields. Wait for a shield to regenerate or come back later.';
+
+			startTimers();
+		})();
 
 		return () => {
 			stopTimers();

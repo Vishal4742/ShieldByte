@@ -29,14 +29,37 @@ export const NEWS_KEYWORDS = [
 	'digital payment fraud'
 ];
 
-/** RSS feed URLs for government and news sources */
-export const RSS_FEEDS = [
-	// Press Information Bureau — Cyber/Tech section
-	'https://pib.gov.in/RssMain.aspx?ModId=6&Lang=1&Regid=3',
-	// CERT-In advisories
-	'https://www.cert-in.org.in/Rss.jsp',
-	// Times of India — Tech
-	'https://timesofindia.indiatimes.com/rssfeeds/5880659.cms'
+export interface RssFeedSource {
+	label: string;
+	url: string;
+}
+
+/** RSS feed URLs for government, news, and community scam-report sources */
+export const RSS_FEEDS: RssFeedSource[] = [
+	{
+		label: 'PIB Cyber/Tech',
+		url: 'https://pib.gov.in/RssMain.aspx?ModId=6&Lang=1&Regid=3'
+	},
+	{
+		label: 'CERT-In Advisories',
+		url: 'https://www.cert-in.org.in/Rss.jsp'
+	},
+	{
+		label: 'Times of India Tech',
+		url: 'https://timesofindia.indiatimes.com/rssfeeds/5880659.cms'
+	},
+	{
+		label: 'Reddit r/Scams New',
+		url: 'https://www.reddit.com/r/Scams/new/.rss'
+	},
+	{
+		label: 'Reddit r/IndiaTech Scam Search',
+		url: 'https://www.reddit.com/r/IndiaTech/search.rss?q=scam&restrict_sr=1&sort=new'
+	},
+	{
+		label: 'Reddit r/personalfinanceindia Fraud Search',
+		url: 'https://www.reddit.com/r/personalfinanceindia/search.rss?q=fraud%20OR%20scam&restrict_sr=1&sort=new'
+	}
 ];
 
 /** NewsAPI base URL */

@@ -21,6 +21,7 @@ import {
 import type { FraudCategory } from './constants.js';
 
 let groqClient: Groq | null = null;
+const CLASSIFIER_MODELS = ['llama-3.1-8b-instant', 'llama-3.3-70b-versatile'] as const;
 
 function getGroq(): Groq {
 	if (!groqClient) {
@@ -53,6 +54,11 @@ function buildUserPrompt(title: string, body: string): string {
   "tip": "one actionable prevention tip in plain language"
 }
 
+Rules:
+- Return at least 3 clues and 3 red_flags when the article describes a concrete scam or fraud pattern.
+- Keep every clue explanation short and plain.
+- Prefer the most specific fraud category that fits the article.
+
 Article Title: ${title}
 Article Body: ${body}`;
 }
@@ -60,37 +66,44 @@ Article Body: ${body}`;
 async function classifyArticle(title: string, body: string): Promise<ClassificationResult | null> {
 	const groq = getGroq();
 
-	try {
-		const completion = await groq.chat.completions.create({
-			model: 'llama-3.3-70b-versatile',
-			messages: [
-				{ role: 'system', content: SYSTEM_PROMPT },
-				{ role: 'user', content: buildUserPrompt(title, body || title) }
-			],
-			temperature: 0.2,
-			max_tokens: 1024,
-			response_format: { type: 'json_object' }
-		});
+	for (const model of CLASSIFIER_MODELS) {
+		try {
+			const completion = await groq.chat.completions.create({
+				model,
+				messages: [
+					{ role: 'system', content: SYSTEM_PROMPT },
+					{ role: 'user', content: buildUserPrompt(title, body || title) }
+				],
+				temperature: 0.2,
+				max_tokens: 700,
+				response_format: { type: 'json_object' }
+			});
 
-		const rawContent = completion.choices[0]?.message?.content;
-		if (!rawContent) {
-			console.error('[classify] Empty response from Groq');
-			return null;
+			const rawContent = completion.choices[0]?.message?.content;
+			if (!rawContent) {
+				console.error(`[classify] Empty response from Groq model ${model}`);
+				continue;
+			}
+
+			const parsed = JSON.parse(rawContent);
+			const validated = ClassificationSchema.safeParse(parsed);
+
+			if (!validated.success) {
+				console.warn(`[classify] Validation failed for ${model}:`, validated.error.issues);
+				const normalized = normalizeClassificationResult(parsed);
+				if (normalized) {
+					return normalized;
+				}
+				continue;
+			}
+
+			return normalizeClassificationResult(validated.data);
+		} catch (err) {
+			console.error(`[classify] Groq API error for ${model}:`, err);
 		}
-
-		const parsed = JSON.parse(rawContent);
-		const validated = ClassificationSchema.safeParse(parsed);
-
-		if (!validated.success) {
-			console.warn('[classify] Validation failed:', validated.error.issues);
-			return normalizeClassificationResult(parsed);
-		}
-
-		return normalizeClassificationResult(validated.data);
-	} catch (err) {
-		console.error('[classify] Groq API error:', err);
-		return null;
 	}
+
+	return null;
 }
 
 interface ClassificationDecision {
@@ -139,7 +152,7 @@ async function classifyWithFallback(params: {
 				categoryHint: params.categoryHint,
 				result: aiResult
 			}),
-			model: 'llama-3.3-70b-versatile'
+			model: CLASSIFIER_MODELS[0]
 		};
 	}
 

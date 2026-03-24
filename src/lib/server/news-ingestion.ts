@@ -148,11 +148,11 @@ const rssParser = new Parser({
 export async function fetchRSSFeeds(): Promise<RawArticle[]> {
 	const allArticles: RawArticle[] = [];
 
-	for (const feedUrl of RSS_FEEDS) {
+	for (const feed of RSS_FEEDS) {
 		try {
-			const feed = await rssParser.parseURL(feedUrl);
-			const articles: RawArticle[] = (feed.items ?? []).map((item) => ({
-				source: feed.title ?? feedUrl,
+			const parsedFeed = await rssParser.parseURL(feed.url);
+			const articles: RawArticle[] = (parsedFeed.items ?? []).map((item) => ({
+				source: parsedFeed.title ?? feed.label,
 				title: item.title ?? 'Untitled',
 				body: item.contentSnippet || item.content || null,
 				url: item.link ?? '',
@@ -165,7 +165,7 @@ export async function fetchRSSFeeds(): Promise<RawArticle[]> {
 					.filter((article): article is RawArticle => article !== null)
 			);
 		} catch (err) {
-			console.warn(`[ingest] RSS feed failed (${feedUrl}):`, err);
+			console.warn(`[ingest] RSS feed failed (${feed.label}):`, err);
 		}
 	}
 

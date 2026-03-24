@@ -13,7 +13,8 @@ const allowedCategories = new Set([
   'lottery_fraud',
   'job_scam',
   'investment_fraud',
-  'customer_support_scam'
+  'customer_support_scam',
+  'not_fraud_relevant'
 ]);
 
 function normalizeCategory(value) {
@@ -80,7 +81,9 @@ async function main() {
     increment(confusion.get(actual), predicted);
 
     const explicitCorrect = record?.review?.is_prediction_correct;
-    const isCorrect = typeof explicitCorrect === 'boolean' ? explicitCorrect : actual === predicted;
+    const isCorrect = typeof explicitCorrect === 'boolean'
+      ? explicitCorrect
+      : actual !== 'not_fraud_relevant' && actual === predicted;
 
     if (isCorrect) {
       correct++;

@@ -39,6 +39,14 @@ Apply these Supabase migrations in order:
 3. `supabase/migrations/003_harden_phase1_pipeline.sql`
 4. `supabase/migrations/004_phase1_observability_and_retries.sql`
 
+If the live database is still on the old schema, you can instead run the bundled finalization file once:
+
+- `supabase/migrations/phase1_finalize.sql`
+
+Phase 2 schema follow-up:
+
+- `supabase/migrations/005_add_simulation_html_to_missions.sql`
+
 After the migrations are applied, Phase 1 is operational through the configured Vercel cron jobs in `vercel.json`:
 
 - `/api/cron/ingest`
@@ -86,6 +94,57 @@ The evaluator reports:
 - per-category accuracy
 - a confusion summary
 - auto-approved accuracy for the highest-confidence subset
+
+You can verify whether the live Supabase project is on the required Phase 1 schema with:
+
+```sh
+npm run verify:phase1:live
+```
+
+## Phase 2 Mission Generation
+
+The repo supports both scheduled generation and direct generation from classified fraud JSON.
+
+- Scheduled pipeline: `GET /api/cron/generate-missions`
+- Direct endpoint: `POST /generate-mission`
+
+Example payload for `POST /generate-mission`:
+
+```json
+{
+  "fraudData": {
+    "fraud_type": "UPI_fraud",
+    "channel": "SMS",
+    "scenario_summary": "Scammers send a refund pretext and trick the victim into approving a collect request.",
+    "victim_profile": "Digital payment users who act quickly under pressure.",
+    "clues": [
+      {
+        "clue_text": "refund collect request",
+        "type": "credential_request",
+        "explanation": "The victim is being tricked into approving an outgoing payment."
+      },
+      {
+        "clue_text": "act in 5 minutes",
+        "type": "urgency",
+        "explanation": "Urgency is used to reduce verification."
+      },
+      {
+        "clue_text": "unknown support number",
+        "type": "unknown_sender",
+        "explanation": "The sender cannot be independently verified."
+      }
+    ],
+    "red_flags": [
+      "Unexpected refund request",
+      "Pressure to act immediately",
+      "Unverified sender identity"
+    ],
+    "tip": "Never approve a payment request to receive money."
+  },
+  "variantCount": 3,
+  "persist": true
+}
+```
 
 ## Ralph Loop for Antigravity
 

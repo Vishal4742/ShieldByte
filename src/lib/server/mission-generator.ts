@@ -9,10 +9,13 @@ import Groq from 'groq-sdk';
 import { z } from 'zod';
 import { supabase } from './supabase.js';
 import { GROQ_API_KEY } from '$env/static/private';
+import { ClassificationSchema } from './extraction.js';
+import { renderMissionHtml } from './mission-rendering.js';
 
 // ─── Groq Client ────────────────────────────────────────────
 
 let groqClient: Groq | null = null;
+const MISSION_MODELS = ['llama-3.1-8b-instant', 'llama-3.3-70b-versatile'] as const;
 
 function getGroq(): Groq {
 	if (!groqClient) {
@@ -55,6 +58,22 @@ type MissionResult = z.infer<typeof MissionSchema>;
 interface MissionGenerationOptions {
 	forceRegenerate?: boolean;
 }
+
+export const MissionGenerationRequestSchema = z.object({
+	fraudData: ClassificationSchema,
+	articleId: z.number().int().positive().optional(),
+	fraudTypeOverride: z.string().min(1).optional(),
+	variantCount: z.number().int().min(1).max(3).default(3),
+	persist: z.boolean().default(true)
+});
+
+export type MissionGenerationRequest = z.infer<typeof MissionGenerationRequestSchema>;
+export type GeneratedMissionRecord = MissionResult & {
+	article_id: number | null;
+	fraud_type: string;
+	variant: number;
+	simulation_html: string;
+};
 
 // ─── SRS Phase 2 Prompts ────────────────────────────────────
 
@@ -104,61 +123,153 @@ async function generateMissionVariant(
 ): Promise<MissionResult | null> {
 	const groq = getGroq();
 
-	try {
-		const completion = await groq.chat.completions.create({
-			model: 'llama-3.3-70b-versatile',
-			messages: [
-				{ role: 'system', content: SYSTEM_PROMPT },
-				{ role: 'user', content: buildGenerationPrompt(fraudData, variantNum) }
-			],
-			temperature: 0.7,
-			max_tokens: 2048,
-			response_format: { type: 'json_object' }
-		});
+	for (const model of MISSION_MODELS) {
+		try {
+			const completion = await groq.chat.completions.create({
+				model,
+				messages: [
+					{ role: 'system', content: SYSTEM_PROMPT },
+					{ role: 'user', content: buildGenerationPrompt(fraudData, variantNum) }
+				],
+				temperature: 0.7,
+				max_tokens: 900,
+				response_format: { type: 'json_object' }
+			});
 
-		const rawContent = completion.choices[0]?.message?.content;
-		if (!rawContent) {
-			console.error('[mission-gen] Empty response from Groq');
-			return null;
-		}
-
-		const parsed = JSON.parse(rawContent);
-		const validated = MissionSchema.safeParse(parsed);
-
-		if (!validated.success) {
-			console.warn('[mission-gen] Validation failed:', validated.error.issues);
-			// Try to use as-is if it has the essential fields
-			if (parsed.message_body && parsed.clues && parsed.sender) {
-				return parsed as MissionResult;
+			const rawContent = completion.choices[0]?.message?.content;
+			if (!rawContent) {
+				console.error(`[mission-gen] Empty response from Groq model ${model}`);
+				continue;
 			}
-			return null;
-		}
 
-		// Verify all trigger_text substrings exist in message_body
-		const mission = validated.data;
-		const invalidClues = mission.clues.filter(
-			(c) => !mission.message_body.includes(c.trigger_text)
-		);
+			const parsed = JSON.parse(rawContent);
+			const validated = MissionSchema.safeParse(parsed);
 
-		if (invalidClues.length > 0) {
-			console.warn(
-				`[mission-gen] ${invalidClues.length} clues don't match message_body, fixing...`
-			);
-			// Filter out invalid clues (keep at least the valid ones)
-			mission.clues = mission.clues.filter((c) =>
-				mission.message_body.includes(c.trigger_text)
-			);
-			if (mission.clues.length < 3) {
-				console.warn('[mission-gen] Too few valid clues after filtering, discarding');
-				return null;
+			if (!validated.success) {
+				console.warn(`[mission-gen] Validation failed for ${model}:`, validated.error.issues);
+				if (!(parsed.message_body && parsed.clues && parsed.sender)) {
+					continue;
+				}
 			}
-		}
 
-		return mission;
-	} catch (err) {
-		console.error('[mission-gen] Groq API error:', err);
-		return null;
+			const mission = validated.success ? validated.data : (parsed as MissionResult);
+			const invalidClues = mission.clues.filter(
+				(c) => !mission.message_body.includes(c.trigger_text)
+			);
+
+			if (invalidClues.length > 0) {
+				console.warn(
+					`[mission-gen] ${invalidClues.length} clues don't match message_body for ${model}, fixing...`
+				);
+				mission.clues = mission.clues.filter((c) =>
+					mission.message_body.includes(c.trigger_text)
+				);
+				if (mission.clues.length < 3) {
+					console.warn('[mission-gen] Too few valid clues after filtering, discarding');
+					continue;
+				}
+			}
+
+			return mission;
+		} catch (err) {
+			console.error(`[mission-gen] Groq API error for ${model}:`, err);
+		}
 	}
+
+	return null;
+}
+
+function normalizeFraudType(
+	fraudData: Record<string, unknown>,
+	fraudTypeOverride?: string,
+	fallback = 'UPI_fraud'
+): string {
+	if (typeof fraudTypeOverride === 'string' && fraudTypeOverride.trim().length > 0) {
+		return fraudTypeOverride.trim();
+	}
+
+	if (typeof fraudData.fraud_type === 'string' && fraudData.fraud_type.trim().length > 0) {
+		return fraudData.fraud_type.trim();
+	}
+
+	return fallback;
+}
+
+async function persistGeneratedMission(record: GeneratedMissionRecord): Promise<boolean> {
+	const { error } = await supabase.from('missions').insert({
+		article_id: record.article_id,
+		fraud_type: record.fraud_type,
+		simulation_type: record.simulation_type,
+		simulation_html: record.simulation_html,
+		sender: record.sender,
+		message_body: record.message_body,
+		clues_json: record.clues,
+		difficulty: record.difficulty_overall,
+		tip: record.tip,
+		variant: record.variant,
+		status: 'active'
+	});
+
+	if (error) {
+		console.error(
+			`[mission-gen] Insert failed for article ${record.article_id ?? 'manual'} variant ${record.variant}:`,
+			error.message
+		);
+		return false;
+	}
+
+	return true;
+}
+
+export async function generateMissionsFromFraudData(
+	request: MissionGenerationRequest
+): Promise<{
+	missions: GeneratedMissionRecord[];
+	generated: number;
+	failed: number;
+}> {
+	const fraudData = request.fraudData as Record<string, unknown>;
+	const fraudType = normalizeFraudType(fraudData, request.fraudTypeOverride);
+	const missions: GeneratedMissionRecord[] = [];
+	let failed = 0;
+
+	for (let variant = 1; variant <= request.variantCount; variant++) {
+		const mission = await generateMissionVariant(fraudData, variant);
+
+		if (!mission) {
+			failed++;
+			continue;
+		}
+
+		const record: GeneratedMissionRecord = {
+			...mission,
+			article_id: request.articleId ?? null,
+			fraud_type: fraudType,
+			variant,
+			simulation_html: renderMissionHtml({
+				simulationType: mission.simulation_type,
+				sender: mission.sender,
+				messageBody: mission.message_body
+			})
+		};
+
+		if (request.persist) {
+			const inserted = await persistGeneratedMission(record);
+			if (!inserted) {
+				failed++;
+				continue;
+			}
+		}
+
+		missions.push(record);
+		await new Promise((resolve) => setTimeout(resolve, 500));
+	}
+
+	return {
+		missions,
+		generated: missions.length,
+		failed
+	};
 }
 
 // ─── Main Pipeline ──────────────────────────────────────────
@@ -266,43 +377,16 @@ export async function runMissionGenerationPipeline(
 			scenario_summary: article.body || article.title,
 			title: article.title
 		};
-
-		for (let variant = 1; variant <= 3; variant++) {
-			const mission = await generateMissionVariant(
-				fraudData as Record<string, unknown>,
-				variant
-			);
-
-			if (mission) {
-				const { error: insertError } = await supabase.from('missions').insert({
-					article_id: article.id,
-					fraud_type: article.category || (fraudData as { fraud_type?: string }).fraud_type || 'UPI_fraud',
-					simulation_type: mission.simulation_type,
-					sender: mission.sender,
-					message_body: mission.message_body,
-					clues_json: mission.clues,
-					difficulty: mission.difficulty_overall,
-					tip: mission.tip,
-					variant,
-					status: 'active'
-				});
-
-				if (insertError) {
-					console.error(
-						`[mission-gen] Insert failed for article ${article.id} variant ${variant}:`,
-						insertError.message
-					);
-					failed++;
-				} else {
-					generated++;
-				}
-			} else {
-				failed++;
-			}
-
-			// Rate limit: 500ms between Groq calls
-			await new Promise((r) => setTimeout(r, 500));
-		}
+		const result = await generateMissionsFromFraudData({
+			fraudData: fraudData as z.infer<typeof ClassificationSchema>,
+			articleId: article.id,
+			fraudTypeOverride:
+				article.category || (fraudData as { fraud_type?: string }).fraud_type || 'UPI_fraud',
+			variantCount: 3,
+			persist: true
+		});
+		generated += result.generated;
+		failed += result.failed;
 
 		console.log(`[mission-gen] Article ${article.id}: completed`);
 	}

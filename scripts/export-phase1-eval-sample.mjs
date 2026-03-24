@@ -21,26 +21,39 @@ if (!Number.isFinite(sampleSize) || sampleSize <= 0) {
 }
 
 async function fetchClassifiedArticles(limit) {
-  const params = new URLSearchParams({
-    select: 'id,title,source,published_at,category,classification_confidence,classification_method,review_status,relevance_score,matched_keywords,raw_extraction',
-    status: 'eq.classified',
-    order: 'published_at.desc.nullslast',
-    limit: String(limit)
-  });
+  const selects = [
+    'id,title,source,published_at,category,classification_confidence,classification_method,review_status,relevance_score,matched_keywords,raw_extraction',
+    'id,title,source,published_at,category,classification_confidence,raw_extraction'
+  ];
 
-  const response = await fetch(`${SUPABASE_URL}/rest/v1/fraud_articles?${params.toString()}`, {
-    headers: {
-      apikey: SUPABASE_SERVICE_ROLE_KEY,
-      Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`
+  for (const select of selects) {
+    const params = new URLSearchParams({
+      select,
+      status: 'eq.classified',
+      order: 'published_at.desc.nullslast',
+      limit: String(limit)
+    });
+
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/fraud_articles?${params.toString()}`, {
+      headers: {
+        apikey: SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`
+      }
+    });
+
+    if (response.ok) {
+      return response.json();
     }
-  });
 
-  if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`Supabase query failed (${response.status}): ${errorText}`);
+    const isMissingColumn = response.status === 400 && errorText.includes('does not exist');
+
+    if (!isMissingColumn) {
+      throw new Error(`Supabase query failed (${response.status}): ${errorText}`);
+    }
   }
 
-  return response.json();
+  throw new Error('Supabase query failed because the live database is missing required columns.');
 }
 
 function toReviewRecord(article) {
@@ -55,9 +68,9 @@ function toReviewRecord(article) {
     published_at: article.published_at,
     predicted_category: article.category,
     confidence: article.classification_confidence,
-    classification_method: article.classification_method,
-    review_status: article.review_status,
-    relevance_score: article.relevance_score,
+    classification_method: article.classification_method ?? null,
+    review_status: article.review_status ?? null,
+    relevance_score: article.relevance_score ?? null,
     matched_keywords: Array.isArray(article.matched_keywords) ? article.matched_keywords : [],
     scenario_summary: extraction.scenario_summary ?? null,
     clues: Array.isArray(extraction.clues) ? extraction.clues : [],

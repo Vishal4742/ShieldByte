@@ -1,0 +1,162 @@
+import { z } from 'zod';
+import { supabase } from './supabase.js';
+
+const ATTEMPT_OUTCOMES = ['success', 'timeout', 'failed'] as const;
+
+export const MissionAttemptSchema = z.object({
+	user_id: z.string().trim().min(1),
+	mission_id: z.number().int().positive(),
+	xp_earned: z.number().int().min(0),
+	base_xp: z.number().int().min(0).default(0),
+	speed_bonus: z.number().int().min(0).default(0),
+	perfect_multiplier: z.number().min(1).default(1),
+	streak_multiplier: z.number().min(1).default(1),
+	clues_found: z.number().int().min(0),
+	clues_missed: z.number().int().min(0),
+	wrong_taps: z.number().int().min(0),
+	lives_remaining: z.number().int().min(0).max(3),
+	time_taken: z.number().int().min(0).max(60),
+	seconds_remaining: z.number().int().min(0).max(60),
+	outcome: z.enum(ATTEMPT_OUTCOMES)
+});
+
+export type MissionAttemptPayload = z.infer<typeof MissionAttemptSchema>;
+
+interface UserStatsRow {
+	user_id: string;
+	total_xp: number | null;
+	streak_days: number | null;
+	rank: string | null;
+	last_mission_at: string | null;
+}
+
+function evaluateRank(totalXp: number) {
+	if (totalXp >= 5000) {
+		return 'Cyber Commander';
+	}
+
+	if (totalXp >= 2000) {
+		return 'Senior Analyst';
+	}
+
+	if (totalXp >= 500) {
+		return 'Field Investigator';
+	}
+
+	return 'Rookie Agent';
+}
+
+function computeNextStreak(lastMissionAt: string | null, now = new Date()) {
+	if (!lastMissionAt) {
+		return 1;
+	}
+
+	const previous = new Date(lastMissionAt);
+
+	if (Number.isNaN(previous.getTime())) {
+		return 1;
+	}
+
+	const currentDay = now.toISOString().slice(0, 10);
+	const previousDay = previous.toISOString().slice(0, 10);
+
+	if (currentDay === previousDay) {
+		return null;
+	}
+
+	const diffMs = now.getTime() - previous.getTime();
+	const diffHours = diffMs / (1000 * 60 * 60);
+
+	return diffHours <= 48 ? 2 : 1;
+}
+
+export async function recordMissionAttempt(payload: MissionAttemptPayload) {
+	const now = new Date();
+	const { data: currentStats, error: statsError } = await supabase
+		.from('user_stats')
+		.select('user_id, total_xp, streak_days, rank, last_mission_at')
+		.eq('user_id', payload.user_id)
+		.maybeSingle<UserStatsRow>();
+
+	if (statsError) {
+		throw new Error(`Failed to load user stats: ${statsError.message}`);
+	}
+
+	const { data: attemptRow, error: attemptError } = await supabase
+		.from('mission_attempts')
+		.insert({
+			user_id: payload.user_id,
+			mission_id: payload.mission_id,
+			xp_earned: payload.xp_earned,
+			clues_found: payload.clues_found,
+			clues_missed: payload.clues_missed,
+			wrong_taps: payload.wrong_taps,
+			lives_remaining: payload.lives_remaining,
+			time_taken: payload.time_taken,
+			outcome: payload.outcome,
+			result_json: payload
+		})
+		.select('id')
+		.single<{ id: number }>();
+
+	if (attemptError || !attemptRow) {
+		throw new Error(`Failed to store mission attempt: ${attemptError?.message ?? 'unknown error'}`);
+	}
+
+	const existingXp = currentStats?.total_xp ?? 0;
+	const streakDays = computeNextStreak(currentStats?.last_mission_at ?? null, now);
+	const nextTotalXp = existingXp + payload.xp_earned;
+	const nextStreakDays =
+		streakDays === null ? (currentStats?.streak_days ?? 1) : Math.max(1, streakDays);
+	const nextRank = evaluateRank(nextTotalXp);
+
+	const combinedMultiplier = Number(
+		(payload.perfect_multiplier * payload.streak_multiplier).toFixed(2)
+	);
+
+	const { error: xpError } = await supabase.from('xp_transactions').insert({
+		user_id: payload.user_id,
+		mission_attempt_id: attemptRow.id,
+		event_type: 'mission_completion',
+		base_xp: payload.base_xp + payload.speed_bonus,
+		multiplier: combinedMultiplier,
+		final_xp: payload.xp_earned,
+		metadata: {
+			mission_id: payload.mission_id,
+			outcome: payload.outcome,
+			seconds_remaining: payload.seconds_remaining,
+			wrong_taps: payload.wrong_taps
+		}
+	});
+
+	if (xpError) {
+		throw new Error(`Failed to store XP transaction: ${xpError.message}`);
+	}
+
+	const { error: upsertError } = await supabase.from('user_stats').upsert(
+		{
+			user_id: payload.user_id,
+			total_xp: nextTotalXp,
+			streak_days: nextStreakDays,
+			rank: nextRank,
+			last_mission_at: now.toISOString(),
+			updated_at: now.toISOString()
+		},
+		{ onConflict: 'user_id' }
+	);
+
+	if (upsertError) {
+		throw new Error(`Failed to update user stats: ${upsertError.message}`);
+	}
+
+	return {
+		attemptId: attemptRow.id,
+		profile: {
+			userId: payload.user_id,
+			totalXp: nextTotalXp,
+			streakDays: nextStreakDays,
+			rank: nextRank,
+			lastMissionAt: now.toISOString()
+		}
+	};
+}

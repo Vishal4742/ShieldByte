@@ -28,7 +28,21 @@ Copy `.env.example` to `.env` and set:
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `NEWSAPI_KEY`
 - `GROQ_API_KEY`
+- `GEMINI_API_KEY`
 - `CRON_SECRET`
+
+Gemini integration:
+
+- `GEMINI_API_KEY` enables Gemini as the primary hosted model for classification and mission generation
+- `GROQ_API_KEY` remains as fallback
+- optional overrides:
+  - `GEMINI_CLASSIFIER_MODEL`
+  - `GEMINI_MISSION_MODEL`
+
+Recommended default Gemini models:
+
+- `GEMINI_CLASSIFIER_MODEL=gemini-2.0-flash`
+- `GEMINI_MISSION_MODEL=gemini-2.0-flash`
 
 ## Phase 1 Deployment
 

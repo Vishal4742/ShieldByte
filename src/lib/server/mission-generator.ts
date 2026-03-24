@@ -8,14 +8,16 @@
 import Groq from 'groq-sdk';
 import { z } from 'zod';
 import { supabase } from './supabase.js';
-import { GROQ_API_KEY } from '$env/static/private';
+import { GEMINI_MISSION_MODEL, GROQ_API_KEY } from '$env/static/private';
 import { ClassificationSchema } from './extraction.js';
 import { renderMissionHtml } from './mission-rendering.js';
+import { generateGeminiJson, getGeminiApiKey } from './gemini.js';
 
 // ─── Groq Client ────────────────────────────────────────────
 
 let groqClient: Groq | null = null;
 const MISSION_MODELS = ['llama-3.1-8b-instant', 'llama-3.3-70b-versatile'] as const;
+const DEFAULT_GEMINI_MISSION_MODEL = GEMINI_MISSION_MODEL || 'gemini-2.0-flash';
 
 function getGroq(): Groq {
 	if (!groqClient) {
@@ -75,6 +77,130 @@ export type GeneratedMissionRecord = MissionResult & {
 	simulation_html: string;
 };
 
+const MISSION_CLUE_TYPES = [
+	'urgency',
+	'suspicious_link',
+	'fake_sender',
+	'credential_request',
+	'upfront_fee',
+	'too_good_to_be_true'
+] as const;
+
+function asString(value: unknown, fallback = ''): string {
+	return typeof value === 'string' && value.trim().length > 0 ? value.trim() : fallback;
+}
+
+function normalizeMissionClueType(value: unknown): (typeof MISSION_CLUE_TYPES)[number] {
+	const normalized = asString(value).toLowerCase().replace(/\s+/g, '_');
+
+	switch (normalized) {
+		case 'urgency':
+		case 'suspicious_link':
+		case 'fake_sender':
+		case 'credential_request':
+		case 'upfront_fee':
+		case 'too_good_to_be_true':
+			return normalized;
+		case 'unknown_sender':
+		case 'fake_authority':
+			return 'fake_sender';
+		case 'too_good':
+			return 'too_good_to_be_true';
+		case 'fake_link':
+			return 'suspicious_link';
+		default:
+			return 'urgency';
+	}
+}
+
+function normalizeDifficulty(value: unknown): 'easy' | 'medium' | 'hard' {
+	const normalized = asString(value).toLowerCase();
+	return normalized === 'easy' || normalized === 'medium' || normalized === 'hard'
+		? normalized
+		: 'medium';
+}
+
+function findBestTriggerText(messageBody: string, candidate: string): string {
+	if (!candidate) return '';
+	if (messageBody.includes(candidate)) return candidate;
+
+	const loweredBody = messageBody.toLowerCase();
+	const loweredCandidate = candidate.toLowerCase();
+	if (loweredBody.includes(loweredCandidate)) {
+		const start = loweredBody.indexOf(loweredCandidate);
+		return messageBody.slice(start, start + candidate.length);
+	}
+
+	const words = loweredCandidate
+		.split(/\s+/)
+		.filter((word) => word.length >= 4);
+	const matchedWord = words.find((word) => loweredBody.includes(word));
+	if (!matchedWord) return '';
+
+	const start = loweredBody.indexOf(matchedWord);
+	const end = Math.min(messageBody.length, start + Math.max(candidate.length, matchedWord.length + 24));
+	return messageBody.slice(start, end).trim();
+}
+
+function normalizeMissionResult(raw: unknown): MissionResult | null {
+	if (typeof raw !== 'object' || raw === null) {
+		return null;
+	}
+
+	const candidate = raw as Record<string, unknown>;
+	const messageBody = asString(candidate.message_body);
+	if (messageBody.length < 20) {
+		return null;
+	}
+
+	const normalized = {
+		simulation_type: (() => {
+			const type = asString(candidate.simulation_type);
+			return ['SMS', 'WhatsApp_message', 'email', 'call_transcript'].includes(type)
+				? type
+				: 'SMS';
+		})(),
+		sender: asString(candidate.sender, 'Unknown sender'),
+		message_body: messageBody,
+		clues: Array.isArray(candidate.clues)
+			? candidate.clues
+					.map((entry, index) => {
+						if (typeof entry !== 'object' || entry === null) {
+							return null;
+						}
+
+						const clue = entry as Record<string, unknown>;
+						const triggerText = findBestTriggerText(
+							messageBody,
+							asString(clue.trigger_text || clue.clue_text)
+						);
+
+						if (!triggerText) {
+							return null;
+						}
+
+						return {
+							id: typeof clue.id === 'number' ? clue.id : index + 1,
+							trigger_text: triggerText,
+							type: normalizeMissionClueType(clue.type),
+							difficulty: normalizeDifficulty(clue.difficulty),
+							explanation: asString(
+								clue.explanation,
+								'This message pattern is a scam warning sign.'
+							).slice(0, 150)
+						};
+					})
+					.filter((entry): entry is z.infer<typeof MissionClueSchema> => entry !== null)
+					.slice(0, 6)
+			: [],
+		difficulty_overall: normalizeDifficulty(candidate.difficulty_overall),
+		tip: asString(candidate.tip, 'Slow down, verify the sender independently, and never share payment approvals.')
+	};
+
+	const validated = MissionSchema.safeParse(normalized);
+	return validated.success ? validated.data : null;
+}
+
 // ─── SRS Phase 2 Prompts ────────────────────────────────────
 
 const SYSTEM_PROMPT = `You are a creative writer who specialises in generating realistic fraud simulation content for a cybersecurity training game. Your simulations must feel authentic and plausible. IMPORTANT: All output MUST be written entirely in English. Do NOT use Hindi, Hinglish, or any other non-English language.`;
@@ -121,7 +247,45 @@ async function generateMissionVariant(
 	fraudData: Record<string, unknown>,
 	variantNum: number
 ): Promise<MissionResult | null> {
-	const groq = getGroq();
+	if (getGeminiApiKey()) {
+		try {
+			const rawContent = await generateGeminiJson({
+				model: DEFAULT_GEMINI_MISSION_MODEL,
+				systemPrompt: SYSTEM_PROMPT,
+				userPrompt: buildGenerationPrompt(fraudData, variantNum),
+				temperature: 0.7,
+				maxOutputTokens: 900
+			});
+
+			if (rawContent) {
+				const parsed = JSON.parse(rawContent);
+				const validated = MissionSchema.safeParse(parsed);
+
+				if (!validated.success) {
+					console.warn(
+						`[mission-gen] Validation failed for Gemini ${DEFAULT_GEMINI_MISSION_MODEL}:`,
+						validated.error.issues
+					);
+					const normalizedMission = normalizeMissionResult(parsed);
+					if (normalizedMission) {
+						return normalizedMission;
+					}
+				} else {
+					return validated.data;
+				}
+			}
+		} catch (err) {
+			console.error(`[mission-gen] Gemini API error for ${DEFAULT_GEMINI_MISSION_MODEL}:`, err);
+		}
+	}
+
+	let groq: Groq;
+	try {
+		groq = getGroq();
+	} catch (err) {
+		console.error('[mission-gen] Groq client unavailable:', err);
+		return null;
+	}
 
 	for (const model of MISSION_MODELS) {
 		try {
@@ -147,9 +311,11 @@ async function generateMissionVariant(
 
 			if (!validated.success) {
 				console.warn(`[mission-gen] Validation failed for ${model}:`, validated.error.issues);
-				if (!(parsed.message_body && parsed.clues && parsed.sender)) {
+				const normalizedMission = normalizeMissionResult(parsed);
+				if (!normalizedMission) {
 					continue;
 				}
+				return normalizedMission;
 			}
 
 			const mission = validated.success ? validated.data : (parsed as MissionResult);

@@ -19,9 +19,12 @@ import {
 	estimateClassificationConfidence
 } from './fraud-signals.js';
 import type { FraudCategory } from './constants.js';
+import { generateGeminiJson, getGeminiApiKey } from './gemini.js';
+import { GEMINI_CLASSIFIER_MODEL } from '$env/static/private';
 
 let groqClient: Groq | null = null;
 const CLASSIFIER_MODELS = ['llama-3.1-8b-instant', 'llama-3.3-70b-versatile'] as const;
+const DEFAULT_GEMINI_CLASSIFIER_MODEL = GEMINI_CLASSIFIER_MODEL || 'gemini-2.0-flash';
 
 function getGroq(): Groq {
 	if (!groqClient) {
@@ -63,8 +66,52 @@ Article Title: ${title}
 Article Body: ${body}`;
 }
 
-async function classifyArticle(title: string, body: string): Promise<ClassificationResult | null> {
-	const groq = getGroq();
+async function classifyArticle(
+	title: string,
+	body: string
+): Promise<{ result: ClassificationResult; model: string } | null> {
+	if (getGeminiApiKey()) {
+		try {
+			const rawContent = await generateGeminiJson({
+				model: DEFAULT_GEMINI_CLASSIFIER_MODEL,
+				systemPrompt: SYSTEM_PROMPT,
+				userPrompt: buildUserPrompt(title, body || title),
+				temperature: 0.2,
+				maxOutputTokens: 700
+			});
+
+			if (rawContent) {
+				const parsed = JSON.parse(rawContent);
+				const validated = ClassificationSchema.safeParse(parsed);
+
+				if (!validated.success) {
+					console.warn(
+						`[classify] Validation failed for Gemini ${DEFAULT_GEMINI_CLASSIFIER_MODEL}:`,
+						validated.error.issues
+					);
+					const normalized = normalizeClassificationResult(parsed);
+					if (normalized) {
+						return { result: normalized, model: DEFAULT_GEMINI_CLASSIFIER_MODEL };
+					}
+				} else {
+					const normalized = normalizeClassificationResult(validated.data);
+					if (normalized) {
+						return { result: normalized, model: DEFAULT_GEMINI_CLASSIFIER_MODEL };
+					}
+				}
+			}
+		} catch (err) {
+			console.error(`[classify] Gemini API error for ${DEFAULT_GEMINI_CLASSIFIER_MODEL}:`, err);
+		}
+	}
+
+	let groq: Groq;
+	try {
+		groq = getGroq();
+	} catch (err) {
+		console.error('[classify] Groq client unavailable:', err);
+		return null;
+	}
 
 	for (const model of CLASSIFIER_MODELS) {
 		try {
@@ -92,12 +139,15 @@ async function classifyArticle(title: string, body: string): Promise<Classificat
 				console.warn(`[classify] Validation failed for ${model}:`, validated.error.issues);
 				const normalized = normalizeClassificationResult(parsed);
 				if (normalized) {
-					return normalized;
+					return { result: normalized, model };
 				}
 				continue;
 			}
 
-			return normalizeClassificationResult(validated.data);
+			const normalized = normalizeClassificationResult(validated.data);
+			if (normalized) {
+				return { result: normalized, model };
+			}
 		} catch (err) {
 			console.error(`[classify] Groq API error for ${model}:`, err);
 		}
@@ -132,27 +182,27 @@ async function classifyWithFallback(params: {
 	categoryHint: FraudCategory | null;
 	relevanceScore: number;
 }): Promise<ClassificationDecision | null> {
-	const aiResult = await classifyArticle(params.title, params.body);
+	const aiResponse = await classifyArticle(params.title, params.body);
 
-	if (aiResult) {
+	if (aiResponse) {
 		const confidence = estimateClassificationConfidence({
-			result: aiResult,
+			result: aiResponse.result,
 			categoryHint: params.categoryHint,
 			relevanceScore: params.relevanceScore,
 			method: 'ai'
 		});
 
 		return {
-			result: aiResult,
+			result: aiResponse.result,
 			method: 'ai',
 			confidence,
 			reviewStatus: determineReviewStatus({
 				confidence,
 				method: 'ai',
 				categoryHint: params.categoryHint,
-				result: aiResult
+				result: aiResponse.result
 			}),
-			model: CLASSIFIER_MODELS[0]
+			model: aiResponse.model
 		};
 	}
 

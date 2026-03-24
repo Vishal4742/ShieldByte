@@ -1,0 +1,17 @@
+{
+	"crons": [
+		{
+			"path": "/api/cron/ingest",
+			"schedule": "0 6 * * *"
+		},
+		{
+			"path": "/api/cron/classify",
+			"schedule": "0 7 * * *"
+		},
+		{
+			"path": "/api/cron/generate-missions",
+			"schedule": "0 8 * * *"
+		}
+	]
+}
+

@@ -1,0 +1,32 @@
+node_modules
+
+# Output
+.output
+.vercel
+.netlify
+.wrangler
+/.svelte-kit
+/build
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.*
+!.env.example
+!.env.test
+
+# Vite
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
+
+# Ralph Loop for Antigravity
+docs/tasks/PRD.md
+docs/tasks/progress.txt
+docs/tasks/prompt.md
+
+# Local design exports and specs
+design-*.html
+ShieldByte_SRS_v4.md

@@ -1,0 +1,218 @@
+/**
+ * ShieldByte — News Ingestion Service
+ * Fetches fraud-related articles from NewsAPI, RSS feeds, and web crawling,
+ * deduplicates against existing DB entries, and stores new ones.
+ */
+
+import Parser from 'rss-parser';
+import { supabase } from './supabase.js';
+import {
+	NEWS_KEYWORDS,
+	RSS_FEEDS,
+	NEWSAPI_BASE,
+	MAX_ARTICLES_PER_FETCH
+} from './constants.js';
+import { NEWSAPI_KEY } from '$env/static/private';
+import { crawlFraudNews } from './web-scraper.js';
+
+/** Shape of an article before DB insertion */
+export interface RawArticle {
+	source: string;
+	title: string;
+	body: string | null;
+	url: string;
+	published_at: string | null;
+}
+
+// ─── NewsAPI ────────────────────────────────────────────────
+
+/**
+ * Fetch fraud-related articles from NewsAPI.
+ * Combines all keywords into a single OR-joined query.
+ */
+export async function fetchNewsAPI(): Promise<RawArticle[]> {
+	if (!NEWSAPI_KEY) {
+		console.warn('[ingest] NEWSAPI_KEY not set — skipping NewsAPI fetch.');
+		return [];
+	}
+
+	const query = NEWS_KEYWORDS.map((kw) => `"${kw}"`).join(' OR ');
+
+	const url = new URL(NEWSAPI_BASE);
+	url.searchParams.set('q', query);
+	url.searchParams.set('language', 'en');
+	url.searchParams.set('sortBy', 'publishedAt');
+	url.searchParams.set('pageSize', String(MAX_ARTICLES_PER_FETCH));
+	url.searchParams.set('apiKey', NEWSAPI_KEY);
+
+	try {
+		const response = await fetch(url.toString());
+		if (!response.ok) {
+			const errText = await response.text();
+			console.error(`[ingest] NewsAPI error (${response.status}): ${errText}`);
+			return [];
+		}
+
+		const data = await response.json();
+		const articles: RawArticle[] = (data.articles ?? []).map(
+			(a: {
+				source?: { name?: string };
+				title?: string;
+				description?: string;
+				content?: string;
+				url?: string;
+				publishedAt?: string;
+			}) => ({
+				source: a.source?.name ?? 'NewsAPI',
+				title: a.title ?? 'Untitled',
+				body: a.description || a.content || null,
+				url: a.url ?? '',
+				published_at: a.publishedAt ?? null
+			})
+		);
+
+		return articles.filter((a) => a.url.length > 0);
+	} catch (err) {
+		console.error('[ingest] NewsAPI fetch failed:', err);
+		return [];
+	}
+}
+
+// ─── RSS Feeds ──────────────────────────────────────────────
+
+const rssParser = new Parser({
+	timeout: 10000
+});
+
+/**
+ * Fetch articles from all configured RSS feeds.
+ */
+export async function fetchRSSFeeds(): Promise<RawArticle[]> {
+	const allArticles: RawArticle[] = [];
+
+	for (const feedUrl of RSS_FEEDS) {
+		try {
+			const feed = await rssParser.parseURL(feedUrl);
+			const articles: RawArticle[] = (feed.items ?? []).map((item) => ({
+				source: feed.title ?? feedUrl,
+				title: item.title ?? 'Untitled',
+				body: item.contentSnippet || item.content || null,
+				url: item.link ?? '',
+				published_at: item.isoDate ?? null
+			}));
+
+			allArticles.push(...articles.filter((a) => a.url.length > 0));
+		} catch (err) {
+			console.warn(`[ingest] RSS feed failed (${feedUrl}):`, err);
+		}
+	}
+
+	return allArticles;
+}
+
+// ─── Deduplication & Storage ────────────────────────────────
+
+/**
+ * Filter out articles whose URLs already exist in the DB.
+ */
+export async function deduplicateArticles(articles: RawArticle[]): Promise<RawArticle[]> {
+	if (articles.length === 0) return [];
+
+	const urls = articles.map((a) => a.url);
+
+	const { data: existing, error } = await supabase
+		.from('fraud_articles')
+		.select('url')
+		.in('url', urls);
+
+	if (error) {
+		console.error('[ingest] Dedup query failed:', error.message);
+		return articles;
+	}
+
+	const existingUrls = new Set((existing ?? []).map((row: { url: string }) => row.url));
+	return articles.filter((a) => !existingUrls.has(a.url));
+}
+
+/**
+ * Insert articles into the fraud_articles table.
+ * Uses upsert with URL as conflict key to be safe.
+ */
+export async function storeArticles(
+	articles: RawArticle[]
+): Promise<{ inserted: number; errors: number }> {
+	if (articles.length === 0) return { inserted: 0, errors: 0 };
+
+	const rows = articles.map((a) => ({
+		source: a.source,
+		title: a.title,
+		body: a.body,
+		url: a.url,
+		published_at: a.published_at,
+		status: 'raw'
+	}));
+
+	const { data, error } = await supabase
+		.from('fraud_articles')
+		.upsert(rows, { onConflict: 'url', ignoreDuplicates: true })
+		.select('id');
+
+	if (error) {
+		console.error('[ingest] Insert failed:', error.message);
+		return { inserted: 0, errors: articles.length };
+	}
+
+	return { inserted: data?.length ?? 0, errors: 0 };
+}
+
+// ─── Main Ingestion Pipeline ────────────────────────────────
+
+/**
+ * Run the full ingestion pipeline:
+ * 1. Fetch from NewsAPI + RSS + Web Crawling (all in parallel)
+ * 2. Deduplicate against DB
+ * 3. Store new articles
+ */
+export async function runIngestionPipeline(): Promise<{
+	totalFetched: number;
+	duplicates: number;
+	inserted: number;
+	errors: number;
+	sources: { newsapi: number; rss: number; scraped: number };
+}> {
+	console.log('[ingest] Starting ingestion pipeline...');
+
+	// 1. Fetch from ALL sources in parallel
+	const [newsArticles, rssArticles, scrapedArticles] = await Promise.all([
+		fetchNewsAPI(),
+		fetchRSSFeeds(),
+		crawlFraudNews()
+	]);
+
+	const allArticles = [...newsArticles, ...rssArticles, ...scrapedArticles];
+	console.log(
+		`[ingest] Fetched ${allArticles.length} articles ` +
+		`(${newsArticles.length} NewsAPI, ${rssArticles.length} RSS, ${scrapedArticles.length} scraped)`
+	);
+
+	// 2. Deduplicate
+	const newArticles = await deduplicateArticles(allArticles);
+	const duplicates = allArticles.length - newArticles.length;
+	console.log(`[ingest] ${newArticles.length} new articles (${duplicates} duplicates filtered)`);
+
+	// 3. Store
+	const result = await storeArticles(newArticles);
+	console.log(`[ingest] Stored ${result.inserted} articles (${result.errors} errors)`);
+
+	return {
+		totalFetched: allArticles.length,
+		duplicates,
+		inserted: result.inserted,
+		errors: result.errors,
+		sources: {
+			newsapi: newsArticles.length,
+			rss: rssArticles.length,
+			scraped: scrapedArticles.length
+		}
+	};
+}

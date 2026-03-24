@@ -16,15 +16,87 @@ import {
 	analyzeFraudSignals,
 	buildFallbackClassification,
 	determineReviewStatus,
-	estimateClassificationConfidence
+	estimateClassificationConfidence,
+	reconcileClassificationResult,
+	type FraudSignalAnalysis
 } from './fraud-signals.js';
 import type { FraudCategory } from './constants.js';
 import { generateGeminiJson, getGeminiApiKey } from './gemini.js';
 import { GEMINI_CLASSIFIER_MODEL } from '$env/static/private';
+import { generateOllamaJson, getOllamaClassifierModel } from './ollama.js';
+import { generateOpenRouterJson, getOpenRouterClassifierModels } from './openrouter.js';
+import { parseJsonObjectLoose } from './json-utils.js';
+import { predictPhase1Category } from './phase1-ml.js';
 
 let groqClient: Groq | null = null;
 const CLASSIFIER_MODELS = ['llama-3.1-8b-instant', 'llama-3.3-70b-versatile'] as const;
 const DEFAULT_GEMINI_CLASSIFIER_MODEL = GEMINI_CLASSIFIER_MODEL || 'gemini-2.0-flash';
+const DEFAULT_OLLAMA_CLASSIFIER_MODEL = getOllamaClassifierModel();
+const OPENROUTER_CLASSIFIER_MODELS = getOpenRouterClassifierModels();
+
+const CLASSIFICATION_JSON_SCHEMA = {
+	type: 'object',
+	properties: {
+		fraud_type: {
+			type: 'string',
+			enum: [
+				'UPI_fraud',
+				'KYC_fraud',
+				'lottery_fraud',
+				'job_scam',
+				'investment_fraud',
+				'customer_support_scam'
+			]
+		},
+		channel: {
+			type: 'string',
+			enum: ['SMS', 'WhatsApp', 'email', 'phone_call', 'social_media']
+		},
+		scenario_summary: { type: 'string' },
+		victim_profile: { type: 'string' },
+		clues: {
+			type: 'array',
+			minItems: 3,
+			maxItems: 6,
+			items: {
+				type: 'object',
+				properties: {
+					clue_text: { type: 'string' },
+					type: {
+						type: 'string',
+						enum: [
+							'urgency',
+							'fake_link',
+							'unknown_sender',
+							'credential_request',
+							'too_good',
+							'fake_authority',
+							'upfront_fee'
+						]
+					},
+					explanation: { type: 'string' }
+				},
+				required: ['clue_text', 'type', 'explanation']
+			}
+		},
+		red_flags: {
+			type: 'array',
+			minItems: 3,
+			maxItems: 5,
+			items: { type: 'string' }
+		},
+		tip: { type: 'string' }
+	},
+	required: [
+		'fraud_type',
+		'channel',
+		'scenario_summary',
+		'victim_profile',
+		'clues',
+		'red_flags',
+		'tip'
+	]
+} as const;
 
 function getGroq(): Groq {
 	if (!groqClient) {
@@ -38,7 +110,19 @@ function getGroq(): Groq {
 
 const SYSTEM_PROMPT = `You are a structured data extraction expert specializing in financial crime and cyber fraud. Your job is to convert raw news articles into clean JSON data that will be used to generate scam simulation scenarios.`;
 
-function buildUserPrompt(title: string, body: string): string {
+function buildUserPrompt(title: string, body: string, analysis?: FraudSignalAnalysis): string {
+	const evidenceBlock =
+		analysis && analysis.categoryHint
+			? `
+
+Evidence hints from the article text:
+- likely_category_hint: ${analysis.categoryHint}
+- signal_strength: ${analysis.signalStrength}
+- matched_terms: ${analysis.matchedKeywords.slice(0, 8).join(', ') || 'none'}
+
+Use these hints only if the article supports them. Do not force the hinted category when the article clearly describes a different scam type.`
+			: '';
+
 	return `Read the following fraud news article carefully. Extract the following information and return ONLY a valid JSON object with no additional text:
 
 {
@@ -61,27 +145,74 @@ Rules:
 - Return at least 3 clues and 3 red_flags when the article describes a concrete scam or fraud pattern.
 - Keep every clue explanation short and plain.
 - Prefer the most specific fraud category that fits the article.
+- Distinguish carefully between these common confusions:
+  - UPI_fraud: collect requests, QR code payments, payment approvals, UPI IDs.
+  - KYC_fraud: account freeze/block warnings, PAN/Aadhaar updates, document verification links.
+  - customer_support_scam: fake helpline numbers, refund desk impersonation, remote-access app requests.
+  - job_scam: hiring or task-job lures, recruitment onboarding payments.
+  - investment_fraud: guaranteed returns, trading or crypto profit groups.
+  - lottery_fraud: prize or lucky draw claims that require a fee or tax.
 
 Article Title: ${title}
-Article Body: ${body}`;
+Article Body: ${body}${evidenceBlock}`;
 }
 
 async function classifyArticle(
 	title: string,
-	body: string
+	body: string,
+	analysis?: FraudSignalAnalysis
 ): Promise<{ result: ClassificationResult; model: string } | null> {
+	for (const model of OPENROUTER_CLASSIFIER_MODELS) {
+		try {
+			const rawContent = await generateOpenRouterJson({
+				model,
+				systemPrompt: SYSTEM_PROMPT,
+				userPrompt: buildUserPrompt(title, body || title, analysis),
+				temperature: 0.2,
+				maxOutputTokens: 700,
+				schema: CLASSIFICATION_JSON_SCHEMA
+			});
+
+			if (!rawContent) {
+				continue;
+			}
+
+			const parsed = parseJsonObjectLoose(rawContent);
+			const validated = ClassificationSchema.safeParse(parsed);
+
+			if (!validated.success) {
+				console.warn(
+					`[classify] Validation failed for OpenRouter ${model}:`,
+					validated.error.issues
+				);
+				const normalized = normalizeClassificationResult(parsed);
+				if (normalized) {
+					return { result: normalized, model: `openrouter:${model}` };
+				}
+				continue;
+			}
+
+			const normalized = normalizeClassificationResult(validated.data);
+			if (normalized) {
+				return { result: normalized, model: `openrouter:${model}` };
+			}
+		} catch (err) {
+			console.error(`[classify] OpenRouter API error for ${model}:`, err);
+		}
+	}
+
 	if (getGeminiApiKey()) {
 		try {
 			const rawContent = await generateGeminiJson({
 				model: DEFAULT_GEMINI_CLASSIFIER_MODEL,
 				systemPrompt: SYSTEM_PROMPT,
-				userPrompt: buildUserPrompt(title, body || title),
+				userPrompt: buildUserPrompt(title, body || title, analysis),
 				temperature: 0.2,
 				maxOutputTokens: 700
 			});
 
 			if (rawContent) {
-				const parsed = JSON.parse(rawContent);
+				const parsed = parseJsonObjectLoose(rawContent);
 				const validated = ClassificationSchema.safeParse(parsed);
 
 				if (!validated.success) {
@@ -105,6 +236,45 @@ async function classifyArticle(
 		}
 	}
 
+	if (DEFAULT_OLLAMA_CLASSIFIER_MODEL) {
+		try {
+			const rawContent = await generateOllamaJson({
+				model: DEFAULT_OLLAMA_CLASSIFIER_MODEL,
+				systemPrompt: SYSTEM_PROMPT,
+				userPrompt: buildUserPrompt(title, body || title, analysis),
+				temperature: 0.2,
+				maxOutputTokens: 700,
+				schema: CLASSIFICATION_JSON_SCHEMA
+			});
+
+			if (rawContent) {
+				const parsed = parseJsonObjectLoose(rawContent);
+				const validated = ClassificationSchema.safeParse(parsed);
+
+				if (!validated.success) {
+					console.warn(
+						`[classify] Validation failed for Ollama ${DEFAULT_OLLAMA_CLASSIFIER_MODEL}:`,
+						validated.error.issues
+					);
+					const normalized = normalizeClassificationResult(parsed);
+					if (normalized) {
+						return { result: normalized, model: `ollama:${DEFAULT_OLLAMA_CLASSIFIER_MODEL}` };
+					}
+				} else {
+					const normalized = normalizeClassificationResult(validated.data);
+					if (normalized) {
+						return { result: normalized, model: `ollama:${DEFAULT_OLLAMA_CLASSIFIER_MODEL}` };
+					}
+				}
+			}
+		} catch (err) {
+			console.error(
+				`[classify] Ollama API error for ${DEFAULT_OLLAMA_CLASSIFIER_MODEL}:`,
+				err
+			);
+		}
+	}
+
 	let groq: Groq;
 	try {
 		groq = getGroq();
@@ -119,7 +289,7 @@ async function classifyArticle(
 				model,
 				messages: [
 					{ role: 'system', content: SYSTEM_PROMPT },
-					{ role: 'user', content: buildUserPrompt(title, body || title) }
+					{ role: 'user', content: buildUserPrompt(title, body || title, analysis) }
 				],
 				temperature: 0.2,
 				max_tokens: 700,
@@ -132,7 +302,7 @@ async function classifyArticle(
 				continue;
 			}
 
-			const parsed = JSON.parse(rawContent);
+			const parsed = parseJsonObjectLoose(rawContent);
 			const validated = ClassificationSchema.safeParse(parsed);
 
 			if (!validated.success) {
@@ -162,6 +332,8 @@ interface ClassificationDecision {
 	confidence: number;
 	reviewStatus: 'auto_approved' | 'needs_review';
 	model: string | null;
+	mlCategory: FraudCategory | null;
+	mlConfidence: number | null;
 }
 
 interface ClassificationRunMetrics {
@@ -176,58 +348,192 @@ interface ClassificationRunMetrics {
 	runLogged: boolean;
 }
 
+function resolveCategoryWithMl(params: {
+	result: ClassificationResult;
+	analysis: FraudSignalAnalysis;
+	mlPrediction: Awaited<ReturnType<typeof predictPhase1Category>>;
+}): ClassificationResult {
+	const { result, analysis, mlPrediction } = params;
+
+	if (!mlPrediction) {
+		return result;
+	}
+
+	if (mlPrediction.category === result.fraud_type) {
+		return result;
+	}
+
+	const heuristicSupportsMl = analysis.categoryHint === mlPrediction.category;
+	const heuristicStrong = analysis.signalStrength === 'strong';
+	const heuristicGap =
+		(analysis.categoryScores[mlPrediction.category] ?? 0) -
+		(analysis.categoryScores[result.fraud_type] ?? 0);
+
+	if (mlPrediction.confidence >= 0.88 && heuristicSupportsMl) {
+		return {
+			...result,
+			fraud_type: mlPrediction.category
+		};
+	}
+
+	if (mlPrediction.confidence >= 0.93 && heuristicStrong && heuristicGap >= 1.5) {
+		return {
+			...result,
+			fraud_type: mlPrediction.category
+		};
+	}
+
+	return result;
+}
+
+function adjustConfidenceWithMl(params: {
+	confidence: number;
+	result: ClassificationResult;
+	analysis: FraudSignalAnalysis;
+	mlPrediction: Awaited<ReturnType<typeof predictPhase1Category>>;
+}): number {
+	const { confidence, result, analysis, mlPrediction } = params;
+
+	if (!mlPrediction) {
+		return confidence;
+	}
+
+	let adjusted = confidence;
+
+	if (mlPrediction.category === result.fraud_type) {
+		adjusted += mlPrediction.confidence >= 0.8 ? 0.05 : 0.02;
+	} else if (mlPrediction.confidence >= 0.85 && analysis.signalStrength !== 'weak') {
+		adjusted -= 0.08;
+	}
+
+	return Number(Math.max(0.2, Math.min(0.97, adjusted)).toFixed(2));
+}
+
 async function classifyWithFallback(params: {
 	title: string;
 	body: string;
 	categoryHint: FraudCategory | null;
 	relevanceScore: number;
+	analysis?: FraudSignalAnalysis;
 }): Promise<ClassificationDecision | null> {
-	const aiResponse = await classifyArticle(params.title, params.body);
+	const heuristicAnalysis = params.analysis ?? analyzeFraudSignals(params.title, params.body);
+	const mlPrediction = await predictPhase1Category({
+		title: params.title,
+		body: params.body,
+		analysis: heuristicAnalysis
+	});
+	const aiResponse = await classifyArticle(params.title, params.body, heuristicAnalysis);
+	const effectiveCategoryHint = params.categoryHint ?? heuristicAnalysis.categoryHint;
+	const effectiveRelevanceScore = Math.max(params.relevanceScore, heuristicAnalysis.relevanceScore);
 
 	if (aiResponse) {
-		const confidence = estimateClassificationConfidence({
+		const heuristicReconciledResult = reconcileClassificationResult({
 			result: aiResponse.result,
-			categoryHint: params.categoryHint,
-			relevanceScore: params.relevanceScore,
-			method: 'ai'
+			analysis: heuristicAnalysis
+		});
+		const finalResult = resolveCategoryWithMl({
+			result: heuristicReconciledResult,
+			analysis: heuristicAnalysis,
+			mlPrediction
+		});
+		const confidence = adjustConfidenceWithMl({
+			confidence: estimateClassificationConfidence({
+				result: finalResult,
+				categoryHint: effectiveCategoryHint,
+				relevanceScore: effectiveRelevanceScore,
+				method: 'ai',
+				signalStrength: heuristicAnalysis.signalStrength,
+				scoreMargin: heuristicAnalysis.scoreMargin
+			}),
+			result: finalResult,
+			analysis: heuristicAnalysis,
+			mlPrediction
 		});
 
 		return {
-			result: aiResponse.result,
+			result: finalResult,
 			method: 'ai',
 			confidence,
 			reviewStatus: determineReviewStatus({
 				confidence,
 				method: 'ai',
-				categoryHint: params.categoryHint,
-				result: aiResponse.result
+				categoryHint: effectiveCategoryHint,
+				result: finalResult,
+				signalStrength: heuristicAnalysis.signalStrength
 			}),
-			model: aiResponse.model
+			model: aiResponse.model,
+			mlCategory: mlPrediction?.category ?? null,
+			mlConfidence: mlPrediction?.confidence ?? null
 		};
 	}
 
-	if (!params.categoryHint) {
-		return null;
+	if (!effectiveCategoryHint) {
+		if (!mlPrediction) {
+			return null;
+		}
+
+		const fallbackResult = buildFallbackClassification({
+			title: params.title,
+			body: params.body,
+			categoryHint: mlPrediction.category
+		});
+		const confidence = adjustConfidenceWithMl({
+			confidence: estimateClassificationConfidence({
+				result: fallbackResult,
+				categoryHint: mlPrediction.category,
+				relevanceScore: effectiveRelevanceScore,
+				method: 'heuristic',
+				signalStrength: heuristicAnalysis.signalStrength,
+				scoreMargin: heuristicAnalysis.scoreMargin
+			}),
+			result: fallbackResult,
+			analysis: heuristicAnalysis,
+			mlPrediction
+		});
+
+		return {
+			result: fallbackResult,
+			method: 'heuristic',
+			confidence,
+			reviewStatus: 'needs_review',
+			model: null,
+			mlCategory: mlPrediction.category,
+			mlConfidence: mlPrediction.confidence
+		};
 	}
 
 	const fallbackResult = buildFallbackClassification({
 		title: params.title,
 		body: params.body,
-		categoryHint: params.categoryHint
+		categoryHint: effectiveCategoryHint
 	});
-	const confidence = estimateClassificationConfidence({
+	const finalFallbackResult = resolveCategoryWithMl({
 		result: fallbackResult,
-		categoryHint: params.categoryHint,
-		relevanceScore: params.relevanceScore,
-		method: 'heuristic'
+		analysis: heuristicAnalysis,
+		mlPrediction
+	});
+	const confidence = adjustConfidenceWithMl({
+		confidence: estimateClassificationConfidence({
+			result: finalFallbackResult,
+			categoryHint: effectiveCategoryHint,
+			relevanceScore: effectiveRelevanceScore,
+			method: 'heuristic',
+			signalStrength: heuristicAnalysis.signalStrength,
+			scoreMargin: heuristicAnalysis.scoreMargin
+		}),
+		result: finalFallbackResult,
+		analysis: heuristicAnalysis,
+		mlPrediction
 	});
 
 	return {
-		result: fallbackResult,
+		result: finalFallbackResult,
 		method: 'heuristic',
 		confidence,
 		reviewStatus: 'needs_review',
-		model: null
+		model: null,
+		mlCategory: mlPrediction?.category ?? null,
+		mlConfidence: mlPrediction?.confidence ?? null
 	};
 }
 
@@ -294,7 +600,8 @@ export async function runClassificationPipeline(): Promise<ClassificationRunMetr
 			title: article.title,
 			body: article.body || '',
 			categoryHint: categoryHint as FraudCategory | null,
-			relevanceScore
+			relevanceScore,
+			analysis: heuristicAnalysis
 		});
 
 		if (decision) {

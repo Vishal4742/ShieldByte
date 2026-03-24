@@ -12,12 +12,17 @@ import { GEMINI_MISSION_MODEL, GROQ_API_KEY } from '$env/static/private';
 import { ClassificationSchema } from './extraction.js';
 import { renderMissionHtml } from './mission-rendering.js';
 import { generateGeminiJson, getGeminiApiKey } from './gemini.js';
+import { generateOllamaJson, getOllamaMissionModel } from './ollama.js';
+import { generateOpenRouterJson, getOpenRouterMissionModels } from './openrouter.js';
+import { parseJsonObjectLoose } from './json-utils.js';
 
 // ─── Groq Client ────────────────────────────────────────────
 
 let groqClient: Groq | null = null;
 const MISSION_MODELS = ['llama-3.1-8b-instant', 'llama-3.3-70b-versatile'] as const;
 const DEFAULT_GEMINI_MISSION_MODEL = GEMINI_MISSION_MODEL || 'gemini-2.0-flash';
+const DEFAULT_OLLAMA_MISSION_MODEL = getOllamaMissionModel();
+const OPENROUTER_MISSION_MODELS = getOpenRouterMissionModels();
 
 function getGroq(): Groq {
 	if (!groqClient) {
@@ -85,6 +90,60 @@ const MISSION_CLUE_TYPES = [
 	'upfront_fee',
 	'too_good_to_be_true'
 ] as const;
+
+const MISSION_JSON_SCHEMA = {
+	type: 'object',
+	properties: {
+		simulation_type: {
+			type: 'string',
+			enum: ['SMS', 'WhatsApp_message', 'email', 'call_transcript']
+		},
+		sender: { type: 'string' },
+		message_body: { type: 'string' },
+		clues: {
+			type: 'array',
+			minItems: 3,
+			maxItems: 6,
+			items: {
+				type: 'object',
+				properties: {
+					id: { type: 'number' },
+					trigger_text: { type: 'string' },
+					type: {
+						type: 'string',
+						enum: [
+							'urgency',
+							'suspicious_link',
+							'fake_sender',
+							'credential_request',
+							'upfront_fee',
+							'too_good_to_be_true'
+						]
+					},
+					difficulty: {
+						type: 'string',
+						enum: ['easy', 'medium', 'hard']
+					},
+					explanation: { type: 'string' }
+				},
+				required: ['id', 'trigger_text', 'type', 'difficulty', 'explanation']
+			}
+		},
+		difficulty_overall: {
+			type: 'string',
+			enum: ['easy', 'medium', 'hard']
+		},
+		tip: { type: 'string' }
+	},
+	required: [
+		'simulation_type',
+		'sender',
+		'message_body',
+		'clues',
+		'difficulty_overall',
+		'tip'
+	]
+} as const;
 
 function asString(value: unknown, fallback = ''): string {
 	return typeof value === 'string' && value.trim().length > 0 ? value.trim() : fallback;
@@ -247,6 +306,39 @@ async function generateMissionVariant(
 	fraudData: Record<string, unknown>,
 	variantNum: number
 ): Promise<MissionResult | null> {
+	for (const model of OPENROUTER_MISSION_MODELS) {
+		try {
+			const rawContent = await generateOpenRouterJson({
+				model,
+				systemPrompt: SYSTEM_PROMPT,
+				userPrompt: buildGenerationPrompt(fraudData, variantNum),
+				temperature: 0.7,
+				maxOutputTokens: 900,
+				schema: MISSION_JSON_SCHEMA
+			});
+
+			if (!rawContent) {
+				continue;
+			}
+
+			const parsed = parseJsonObjectLoose(rawContent);
+			const validated = MissionSchema.safeParse(parsed);
+
+			if (!validated.success) {
+				console.warn(`[mission-gen] Validation failed for OpenRouter ${model}:`, validated.error.issues);
+				const normalizedMission = normalizeMissionResult(parsed);
+				if (!normalizedMission) {
+					continue;
+				}
+				return normalizedMission;
+			}
+
+			return validated.data;
+		} catch (err) {
+			console.error(`[mission-gen] OpenRouter API error for ${model}:`, err);
+		}
+	}
+
 	if (getGeminiApiKey()) {
 		try {
 			const rawContent = await generateGeminiJson({
@@ -258,7 +350,7 @@ async function generateMissionVariant(
 			});
 
 			if (rawContent) {
-				const parsed = JSON.parse(rawContent);
+				const parsed = parseJsonObjectLoose(rawContent);
 				const validated = MissionSchema.safeParse(parsed);
 
 				if (!validated.success) {
@@ -276,6 +368,39 @@ async function generateMissionVariant(
 			}
 		} catch (err) {
 			console.error(`[mission-gen] Gemini API error for ${DEFAULT_GEMINI_MISSION_MODEL}:`, err);
+		}
+	}
+
+	if (DEFAULT_OLLAMA_MISSION_MODEL) {
+		try {
+			const rawContent = await generateOllamaJson({
+				model: DEFAULT_OLLAMA_MISSION_MODEL,
+				systemPrompt: SYSTEM_PROMPT,
+				userPrompt: buildGenerationPrompt(fraudData, variantNum),
+				temperature: 0.7,
+				maxOutputTokens: 900,
+				schema: MISSION_JSON_SCHEMA
+			});
+
+			if (rawContent) {
+				const parsed = parseJsonObjectLoose(rawContent);
+				const validated = MissionSchema.safeParse(parsed);
+
+				if (!validated.success) {
+					console.warn(
+						`[mission-gen] Validation failed for Ollama ${DEFAULT_OLLAMA_MISSION_MODEL}:`,
+						validated.error.issues
+					);
+					const normalizedMission = normalizeMissionResult(parsed);
+					if (normalizedMission) {
+						return normalizedMission;
+					}
+				} else {
+					return validated.data;
+				}
+			}
+		} catch (err) {
+			console.error(`[mission-gen] Ollama API error for ${DEFAULT_OLLAMA_MISSION_MODEL}:`, err);
 		}
 	}
 
@@ -306,7 +431,7 @@ async function generateMissionVariant(
 				continue;
 			}
 
-			const parsed = JSON.parse(rawContent);
+			const parsed = parseJsonObjectLoose(rawContent);
 			const validated = MissionSchema.safeParse(parsed);
 
 			if (!validated.success) {

@@ -22,8 +22,8 @@ if (!Number.isFinite(sampleSize) || sampleSize <= 0) {
 
 async function fetchClassifiedArticles(limit) {
   const selects = [
-    'id,title,source,published_at,category,classification_confidence,classification_method,review_status,relevance_score,matched_keywords,raw_extraction',
-    'id,title,source,published_at,category,classification_confidence,raw_extraction'
+    'id,title,body,source,published_at,category,classification_confidence,classification_method,review_status,relevance_score,matched_keywords,raw_extraction',
+    'id,title,body,source,published_at,category,classification_confidence,raw_extraction'
   ];
 
   for (const select of selects) {
@@ -64,6 +64,7 @@ function toReviewRecord(article) {
   return {
     article_id: article.id,
     title: article.title,
+    body: article.body ?? null,
     source: article.source,
     published_at: article.published_at,
     predicted_category: article.category,

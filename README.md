@@ -30,6 +30,17 @@ Copy `.env.example` to `.env` and set:
 - `GROQ_API_KEY`
 - `GEMINI_API_KEY`
 - `CRON_SECRET`
+- optionally:
+  - `OPENROUTER_API_KEY`
+  - `OPENROUTER_API_KEY_2`
+  - `OPENROUTER_API_KEY_3`
+  - `OPENROUTER_CLASSIFIER_MODELS`
+  - `OPENROUTER_MISSION_MODELS`
+  - `OPENROUTER_FEEDBACK_MODELS`
+  - `OLLAMA_BASE_URL`
+  - `OLLAMA_CLASSIFIER_MODEL`
+  - `OLLAMA_MISSION_MODEL`
+  - `OLLAMA_FEEDBACK_MODEL`
 
 Gemini integration:
 
@@ -43,6 +54,29 @@ Recommended default Gemini models:
 
 - `GEMINI_CLASSIFIER_MODEL=gemini-2.0-flash`
 - `GEMINI_MISSION_MODEL=gemini-2.0-flash`
+
+Ollama integration:
+
+- if `OLLAMA_*_MODEL` vars are set, ShieldByte uses Ollama as the last fallback for classification, mission generation, and feedback
+- practical local default:
+  - `OLLAMA_CLASSIFIER_MODEL=qwen2.5:7b`
+  - `OLLAMA_MISSION_MODEL=qwen2.5:7b`
+  - `OLLAMA_FEEDBACK_MODEL=qwen2.5:7b`
+
+OpenRouter integration:
+
+- if `OPENROUTER_*_MODELS` vars are set, ShieldByte tries each configured OpenRouter model in order
+- if multiple OpenRouter API keys are set, ShieldByte rotates across them when one key is rate-limited or rejected
+- if a provider rejects `json_schema`, ShieldByte automatically retries with `json_object`
+- recommended failover order is:
+  - OpenRouter models in env order
+  - Gemini
+  - Groq where applicable
+  - Ollama last
+- example:
+  - `OPENROUTER_CLASSIFIER_MODELS=model-a,model-b,model-c`
+  - `OPENROUTER_MISSION_MODELS=model-a,model-b,model-c`
+  - `OPENROUTER_FEEDBACK_MODELS=model-a,model-b,model-c`
 
 ## Phase 1 Deployment
 
@@ -108,6 +142,16 @@ The evaluator reports:
 - per-category accuracy
 - a confusion summary
 - auto-approved accuracy for the highest-confidence subset
+
+Optional supervised model training:
+
+```sh
+npm run train:phase1:model -- tmp/phase1-eval-sample-YYYY-MM-DDTHH-MM-SS-sssZ.json
+```
+
+This trains a lightweight Naive Bayes category model and writes it to `tmp/phase1-category-model.json`.
+The classifier will automatically use that file on future Phase 1 runs. To override the location, set
+`PHASE1_CATEGORY_MODEL_PATH` in the environment.
 
 You can verify whether the live Supabase project is on the required Phase 1 schema with:
 

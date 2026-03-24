@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { supabase } from './supabase.js';
 import { resolveLivesState, MAX_LIVES, LIFE_REGEN_MS } from '$lib/gameplay/engine.js';
+import { evaluateBadges, type EarnedBadge } from './badge-engine.js';
 
 const ATTEMPT_OUTCOMES = ['success', 'timeout', 'failed'] as const;
 
@@ -152,6 +153,38 @@ export async function recordMissionAttempt(payload: MissionAttemptPayload) {
 		throw new Error(`Failed to update user stats: ${upsertError.message}`);
 	}
 
+	// ── Rank-up detection ──
+	const previousRank = currentStats?.rank ?? 'Rookie Agent';
+	const rankUp =
+		previousRank !== nextRank ? { from: previousRank, to: nextRank } : null;
+
+	// ── Badge evaluation (non-blocking — errors are caught internally) ──
+	let newBadges: EarnedBadge[] = [];
+	try {
+		// Fetch fraud_type for badge conditions
+		const { data: missionRow } = await supabase
+			.from('missions')
+			.select('fraud_type')
+			.eq('id', payload.mission_id)
+			.maybeSingle<{ fraud_type: string }>();
+
+		newBadges = await evaluateBadges({
+			userId: payload.user_id,
+			missionId: payload.mission_id,
+			attemptId: attemptRow.id,
+			timeTaken: payload.time_taken,
+			wrongTaps: payload.wrong_taps,
+			cluesFound: payload.clues_found,
+			cluesMissed: payload.clues_missed,
+			outcome: payload.outcome,
+			streakDays: nextStreakDays,
+			rank: nextRank,
+			fraudType: missionRow?.fraud_type ?? ''
+		});
+	} catch (err) {
+		console.error('[gameplay] Badge evaluation failed (non-blocking):', err);
+	}
+
 	return {
 		attemptId: attemptRow.id,
 		profile: {
@@ -165,7 +198,9 @@ export async function recordMissionAttempt(payload: MissionAttemptPayload) {
 			lives: payload.lives_remaining,
 			lastUpdatedAt: now.getTime(),
 			nextLifeInMs: payload.lives_remaining >= MAX_LIVES ? null : LIFE_REGEN_MS
-		}
+		},
+		newBadges,
+		rankUp
 	};
 }
 

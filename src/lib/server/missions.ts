@@ -140,3 +140,18 @@ export async function fetchRandomActiveMission(filters?: {
 	const randomIndex = Math.floor(Math.random() * data.length);
 	return normalizeMission(data[randomIndex] as MissionRow);
 }
+
+export async function fetchMissionById(id: number): Promise<ThreatMission | null> {
+	const { data, error } = await supabase
+		.from('missions')
+		.select('id, article_id, fraud_type, simulation_type, sender, message_body, difficulty, tip, variant, clues_json')
+		.eq('id', id)
+		.maybeSingle();
+
+	if (error || !data) {
+		console.error('[missions] Failed to fetch mission by ID:', error?.message);
+		return null;
+	}
+
+	return normalizeMission(data as MissionRow);
+}

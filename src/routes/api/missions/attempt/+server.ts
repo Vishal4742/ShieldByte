@@ -24,7 +24,9 @@ export const POST: RequestHandler = async ({ request }) => {
 			success: true,
 			attempt_id: result.attemptId,
 			profile: result.profile,
-			lives: result.lives
+			lives: result.lives,
+			new_badges: result.newBadges,
+			rank_up: result.rankUp
 		});
 	} catch (err) {
 		console.error('[missions/attempt] Failed to record mission attempt:', err);

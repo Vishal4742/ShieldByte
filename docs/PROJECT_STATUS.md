@@ -10,7 +10,8 @@ Current project state:
 - `Phase 1` is implemented and operational from a pipeline/schema perspective.
 - `Phase 2` is implemented for mission generation, with direct API generation and stored simulation HTML.
 - `Phase 3` is mostly implemented for the web MVP, with playable mission flow and attempt persistence.
-- `Phases 4-8` are still mostly open.
+- `Phase 4` is implemented with AI feedback engine (Ollama local-first + Gemini fallback).
+- `Phases 5-8` are implemented.
 
 Important caveats:
 - Phase 1 accuracy signoff is still pending. The pipeline is built, but the `>85%` SRS accuracy target is not yet proven.
@@ -19,6 +20,8 @@ Important caveats:
 ## Done
 
 ### Phase 1: Trend Collection and Classification
+
+> **Author:** Codex
 
 Implemented:
 - Multi-source ingestion pipeline
@@ -44,6 +47,8 @@ Relevant files:
 
 ### Phase 2: Scenario Generation
 
+> **Author:** Codex
+
 Implemented:
 - Mission generation from classified fraud data
 - Direct `POST /generate-mission` endpoint
@@ -60,6 +65,8 @@ Relevant files:
 - `supabase/migrations/005_add_simulation_html_to_missions.sql`
 
 ### Phase 3: Core Web Gameplay
+
+> **Author:** Codex
 
 Implemented:
 - Dedicated `/play` route
@@ -85,7 +92,46 @@ Relevant files:
 - `src/routes/api/missions/attempt/+server.ts`
 - `supabase/migrations/006_add_gameplay_progress_tables.sql`
 
+### Phase 4: AI Feedback Engine
+
+> **Author:** Antigravity
+
+Implemented:
+- AI-powered post-mission feedback generation (Ollama local-first, Gemini fallback)
+- `POST /api/feedback/generate` endpoint
+- `feedback_log` table with indexed lookups
+- AI Mentor feedback card in result screen with loading skeleton and graceful degradation
+- Feedback is specific to fraud type and clues missed
+- JSON schema enforcement for structured LLM output
+
+Relevant files:
+- `src/lib/server/feedback-engine.ts`
+- `src/lib/server/ollama.ts`
+- `src/routes/api/feedback/generate/+server.ts`
+- `src/lib/components/gameplay/GameplayEngine.svelte`
+- `supabase/migrations/008_add_feedback_log.sql`
+
+## Phase 5: Gamification System
+
+> **Author:** Antigravity
+
+Implemented:
+- Badge storage table `user_badges`
+- Badge evaluator engine for 7 active badges
+- Real-time rank-up and badge awards per mission try
+- Gameplay UI rendering rank-up and badge cards
+- Profile API endpoint to aggregate Gamification state
+
+Relevant files:
+- `supabase/migrations/009_add_badges_table.sql`
+- `src/lib/server/badge-engine.ts`
+- `src/lib/server/gameplay.ts`
+- `src/routes/api/user/profile/+server.ts`
+- `src/lib/components/gameplay/GameplayEngine.svelte`
+
 ### Existing Web Surface
+
+> **Author:** Codex
 
 Implemented:
 - Replaced starter homepage
@@ -132,54 +178,62 @@ Relevant file showing current gap:
 Partial:
 - A guest-like persistent player id exists in local storage for tracking mission attempts.
 - Basic user stat records exist at the backend level.
+- `GET /api/user/profile` exists to pull gamification stats
 - There is no full Google auth, user profile page, or mission history UI yet.
 
 ## Not Done
 
-### Phase 4: AI Feedback Engine
+### Phase 6: WhatsApp Bot Integration (Completed)
+- **Author**: Antigravity
+- **Goal**: Add a WhatsApp bot for mission delivery and result parsing.
+- **Completed**:
+  - Webhook endpoint for Meta Cloud API integration.
+  - WhatsApp session state machine (`whatsapp_sessions` table).
+  - Mission delivery over WhatsApp.
+  - Answer parsing mapped to the web's `recordMissionAttempt()`.
 
-Missing:
-- `POST /feedback/generate`
-- AI-generated post-mission feedback flow
-- feedback persistence in `feedback_log`
-- result screen integration for AI feedback
+### Phase 7: Sharing and Referral System (Completed)
 
-### Phase 5: Full Gamification System
+> **Author:** Antigravity
 
-Missing or incomplete:
-- Badge evaluator
-- Full rank-up event flow
-- Proper streak engine across signed-in users
-- Badge storage and award logic
-- Profile-facing progression dashboard
+Implemented:
+- `referral_links` and `referral_claims` tables for mapping shares to recruits
+- `POST /api/referrals/generate` API for unique short link creation
+- `POST /api/referrals/claim` API for reward and badge distribution
+- Referral Dashboard at `/profile/referrals` to track invites, clicks, and XP earned
+- Challenge Landing Page at `/challenge/[code]` to onboard new recruits instantly
+- Gameplay Share Button with clipboard integration
+- Extended badge engine for `viral_protector` and `mentor` badges
 
-### Phase 6: WhatsApp Bot
+Relevant files:
+- `supabase/migrations/011_add_referrals.sql`
+- `src/routes/api/referrals/generate/+server.ts`
+- `src/routes/api/referrals/claim/+server.ts`
+- `src/routes/profile/referrals/+page.server.ts`
+- `src/routes/profile/referrals/+page.svelte`
+- `src/routes/challenge/[code]/+page.server.ts`
+- `src/routes/challenge/[code]/+page.svelte`
+- `src/lib/server/badge-engine.ts`
 
-Missing:
-- Webhook endpoint
-- conversation state machine
-- mission delivery over WhatsApp
-- answer parsing and WhatsApp result flow
+### Phase 8: Full UI / UX Surface (Completed)
 
-### Phase 7: Sharing and Referral System
+> **Author:** Antigravity
 
-Missing:
-- share link generation
-- challenge landing flow
-- referral reward logic
-- referral dashboard
+Implemented:
+- Global navigation bar in `+layout.svelte` (Home, Play, Profile, Referrals)
+- Full Profile Dashboard at `/profile` with rank card, XP progress bar, and stats grid
+- 9-badge gallery with earned/locked states and date earned
+- Mission history table with animated rows, outcome coloring, and clue counts
+- Auto-redirect from localStorage player ID to profile
+- Quick-action links to Play and Referrals
 
-### Phase 8: Full UI / UX Surface
-
-Missing:
-- Dedicated result screen route/page
-- profile dashboard
-- badges/rank/profile UI
-- mission history UI
-- full account-linked progression views
+Relevant files:
+- `src/routes/+layout.svelte`
+- `src/routes/profile/+page.server.ts`
+- `src/routes/profile/+page.svelte`
 
 ## Current Best Summary
 
 If you need a short status line:
 
-`ShieldByte has working ingestion, classification, mission generation, homepage/article flows, and a playable web mission engine. Accuracy validation, AI feedback, full gamification, WhatsApp, referrals, and profile/product completion are still open.`
+`ShieldByte has working ingestion, classification, mission generation, homepage/article flows, playable web mission engine, AI feedback tutor, gamification badge system, WhatsApp bot, referral sharing system, and full profile/badges/history UI. Accuracy validation and full Google Auth are still open.`

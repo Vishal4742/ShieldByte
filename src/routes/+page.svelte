@@ -26,17 +26,7 @@
 	<div class="shell__glow shell__glow--left"></div>
 	<div class="shell__glow shell__glow--right"></div>
 
-	<header class="masthead">
-		<div class="masthead__brand">
-			<p class="masthead__label">ShieldByte</p>
-			<span class="masthead__meta">Threat training console</span>
-		</div>
-
-		<nav>
-			<a href="#feed">Cases</a>
-			<a href="#mission">Mission</a>
-		</nav>
-	</header>
+	<!-- Nav is now in +layout.svelte -->
 
 	<main>
 		<Hero articles={data.articles} />
@@ -148,23 +138,6 @@
 		background: #5c7fd8;
 	}
 
-	.masthead {
-		position: sticky;
-		top: 0;
-		z-index: 20;
-		display: flex;
-		justify-content: space-between;
-		gap: 1rem;
-		align-items: center;
-		padding: 1rem clamp(1.2rem, 4vw, 3rem);
-		backdrop-filter: blur(18px);
-		background: rgba(4, 6, 11, 0.72);
-		border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-	}
-
-	.masthead__label,
-	.masthead__meta,
-	nav a,
 	.start-strip span,
 	.section-heading p,
 	.feed-panel__hint,
@@ -174,22 +147,6 @@
 		text-transform: uppercase;
 		letter-spacing: 0.18em;
 		color: var(--text-muted);
-	}
-
-	.masthead__meta {
-		display: block;
-		margin-top: 0.35rem;
-	}
-
-	nav {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 1rem;
-	}
-
-	nav a {
-		color: var(--text-strong);
-		text-decoration: none;
 	}
 
 	main {
@@ -282,10 +239,6 @@
 	}
 
 	@media (max-width: 720px) {
-		.masthead {
-			flex-direction: column;
-			align-items: flex-start;
-		}
 	}
 
 	@media (prefers-reduced-motion: reduce) {

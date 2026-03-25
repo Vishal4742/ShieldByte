@@ -346,6 +346,72 @@ export interface FraudSignalAnalysis {
 	channelHint: Channel | null;
 }
 
+export interface FraudRelevanceDecision {
+	isRelevant: boolean;
+	confidence: number;
+	reasons: string[];
+}
+
+const NON_SCAM_CONTEXT_PATTERNS: WeightedPattern[] = [
+	{ pattern: 'fight fraud', weight: 3 },
+	{ pattern: 'fraud prevention', weight: 4 },
+	{ pattern: 'prevent fraud', weight: 3 },
+	{ pattern: 'anti money laundering', weight: 5 },
+	{ pattern: 'money laundering', weight: 4 },
+	{ pattern: 'awareness campaign', weight: 4 },
+	{ pattern: 'compensation proposal', weight: 4 },
+	{ pattern: 'proposal', weight: 1 },
+	{ pattern: 'guidelines', weight: 2 },
+	{ pattern: 'advisory', weight: 3 },
+	{ pattern: 'policy', weight: 2 },
+	{ pattern: 'compliance', weight: 3 },
+	{ pattern: 'tooling', weight: 2 },
+	{ pattern: 'software', weight: 1 },
+	{ pattern: 'platform', weight: 1 },
+	{ pattern: 'ai vs ai', weight: 5 },
+	{ pattern: 'future of fraud prevention', weight: 5 },
+	{ pattern: 'to fight money laundering', weight: 5 },
+	{ pattern: 'rolls out', weight: 3 },
+	{ pattern: 'to launch in india', weight: 4 },
+	{ pattern: 'smartphone', weight: 4 },
+	{ pattern: 'feature', weight: 2 },
+	{ pattern: 'government rescuing', weight: 3 },
+	{ pattern: 'workshop', weight: 3 },
+	{ pattern: 'study', weight: 2 },
+	{ pattern: 'delegation', weight: 2 },
+	{ pattern: 'announcement', weight: 2 },
+	{ pattern: 'announces', weight: 2 },
+	{ pattern: 'ministry', weight: 3 },
+	{ pattern: 'railways', weight: 3 },
+	{ pattern: 'pm-kisan', weight: 5 },
+	{ pattern: 'घोषणा', weight: 3 },
+	{ pattern: 'कार्यशाला', weight: 3 },
+	{ pattern: 'अध्ययन', weight: 2 },
+	{ pattern: 'मंत्रालय', weight: 3 },
+	{ pattern: 'किसान', weight: 4 },
+	{ pattern: 'सहकारी', weight: 4 },
+	{ pattern: 'युवा', weight: 2 }
+];
+
+const SCAM_INCIDENT_PATTERNS: WeightedPattern[] = [
+	{ pattern: 'victim', weight: 2 },
+	{ pattern: 'scammers', weight: 2 },
+	{ pattern: 'posed as', weight: 3 },
+	{ pattern: 'pretending to be', weight: 3 },
+	{ pattern: 'duped', weight: 3 },
+	{ pattern: 'cheated', weight: 2 },
+	{ pattern: 'defrauded', weight: 2 },
+	{ pattern: 'lost rs', weight: 3 },
+	{ pattern: 'lost money', weight: 3 },
+	{ pattern: 'transferred money', weight: 2 },
+	{ pattern: 'shared otp', weight: 4 },
+	{ pattern: 'clicked the link', weight: 3 },
+	{ pattern: 'collect request', weight: 4 },
+	{ pattern: 'remote access', weight: 4 },
+	{ pattern: 'job offer', weight: 2 },
+	{ pattern: 'guaranteed return', weight: 4 }
+];
+
 function normalizeText(...values: Array<string | null | undefined>): string {
 	return values
 		.map((value) => (typeof value === 'string' ? value.toLowerCase() : ''))
@@ -466,6 +532,54 @@ export function analyzeFraudSignals(title: string, body?: string | null): FraudS
 		scoreMargin,
 		signalStrength,
 		channelHint: bestCategory ? CATEGORY_PROFILES[bestCategory].channelHint : null
+	};
+}
+
+export function assessFraudRelevance(
+	title: string,
+	body: string | null | undefined,
+	analysis?: FraudSignalAnalysis
+): FraudRelevanceDecision {
+	const signalAnalysis = analysis ?? analyzeFraudSignals(title, body);
+	const text = normalizeText(title, body);
+	const negativeHits = findWeightedHits(text, NON_SCAM_CONTEXT_PATTERNS);
+	const positiveHits = findWeightedHits(text, SCAM_INCIDENT_PATTERNS);
+	const negativeScore = negativeHits.reduce((sum, entry) => sum + entry.weight, 0);
+	const positiveScore = positiveHits.reduce((sum, entry) => sum + entry.weight, 0) + signalAnalysis.relevanceScore * 4;
+	const reasons = unique([
+		...negativeHits.map((entry) => `non_scam:${entry.pattern}`),
+		...positiveHits.map((entry) => `scam:${entry.pattern}`)
+	]).slice(0, 8);
+
+	if (negativeScore >= positiveScore + 3) {
+		return {
+			isRelevant: false,
+			confidence: Number(Math.min(0.98, 0.7 + Math.min(0.24, (negativeScore - positiveScore) * 0.04)).toFixed(2)),
+			reasons
+		};
+	}
+
+	if (signalAnalysis.relevanceScore < 0.28 && negativeScore >= 2 && positiveScore < 4) {
+		return {
+			isRelevant: false,
+			confidence: 0.78,
+			reasons
+		};
+	}
+
+	const normalizedBody = normalizeText(body);
+	if (!normalizedBody && signalAnalysis.relevanceScore < 0.4 && positiveScore < 3) {
+		return {
+			isRelevant: false,
+			confidence: 0.76,
+			reasons
+		};
+	}
+
+	return {
+		isRelevant: true,
+		confidence: Number(Math.min(0.95, 0.55 + Math.min(0.3, positiveScore * 0.03 + signalAnalysis.relevanceScore * 0.2)).toFixed(2)),
+		reasons
 	};
 }
 

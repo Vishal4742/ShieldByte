@@ -14,6 +14,7 @@ import {
 } from './extraction.js';
 import {
 	analyzeFraudSignals,
+	assessFraudRelevance,
 	buildFallbackClassification,
 	determineReviewStatus,
 	estimateClassificationConfidence,
@@ -338,6 +339,7 @@ interface ClassificationDecision {
 
 interface ClassificationRunMetrics {
 	classified: number;
+	irrelevant: number;
 	retried: number;
 	failed: number;
 	total: number;
@@ -551,6 +553,7 @@ export async function runClassificationPipeline(): Promise<ClassificationRunMetr
 		console.error('[classify] DB fetch error:', error.message);
 		return {
 			classified: 0,
+			irrelevant: 0,
 			retried: 0,
 			failed: 0,
 			total: 0,
@@ -566,6 +569,7 @@ export async function runClassificationPipeline(): Promise<ClassificationRunMetr
 		console.log('[classify] No raw articles to classify.');
 		return {
 			classified: 0,
+			irrelevant: 0,
 			retried: 0,
 			failed: 0,
 			total: 0,
@@ -580,6 +584,7 @@ export async function runClassificationPipeline(): Promise<ClassificationRunMetr
 	console.log(`[classify] Processing ${rawArticles.length} articles...`);
 
 	let classified = 0;
+	let irrelevant = 0;
 	let retried = 0;
 	let failed = 0;
 	let autoApproved = 0;
@@ -589,6 +594,7 @@ export async function runClassificationPipeline(): Promise<ClassificationRunMetr
 
 	for (const article of rawArticles) {
 		const heuristicAnalysis = analyzeFraudSignals(article.title, article.body || '');
+		const relevanceDecision = assessFraudRelevance(article.title, article.body || '', heuristicAnalysis);
 		const categoryHint =
 			(typeof article.category_hint === 'string' ? article.category_hint : null) ??
 			heuristicAnalysis.categoryHint;
@@ -596,6 +602,37 @@ export async function runClassificationPipeline(): Promise<ClassificationRunMetr
 			typeof article.relevance_score === 'number'
 				? article.relevance_score
 				: heuristicAnalysis.relevanceScore;
+
+		if (!relevanceDecision.isRelevant) {
+			const { error: irrelevantError } = await supabase
+				.from('fraud_articles')
+				.update({
+					category: null,
+					category_hint: categoryHint,
+					relevance_score: relevanceScore,
+					classification_confidence: relevanceDecision.confidence,
+					classification_method: 'heuristic',
+					classification_model: null,
+					review_status: 'reviewed',
+					retry_count: 0,
+					failed_at: null,
+					last_error: null,
+					raw_extraction: null,
+					status: 'irrelevant'
+				})
+				.eq('id', article.id);
+
+			if (irrelevantError) {
+				console.error(`[classify] Irrelevant update failed for ${article.id}:`, irrelevantError.message);
+				failed++;
+			} else {
+				irrelevant++;
+			}
+
+			await new Promise((resolve) => setTimeout(resolve, 80));
+			continue;
+		}
+
 		const decision = await classifyWithFallback({
 			title: article.title,
 			body: article.body || '',
@@ -667,12 +704,13 @@ export async function runClassificationPipeline(): Promise<ClassificationRunMetr
 	}
 
 	console.log(
-		`[classify] Done: ${classified} classified, ${retried} retried, ${failed} failed out of ${rawArticles.length}`
+		`[classify] Done: ${classified} classified, ${irrelevant} irrelevant, ${retried} retried, ${failed} failed out of ${rawArticles.length}`
 	);
 
 	const { error: runLogError } = await supabase.from('classification_runs').insert({
 		total_considered: rawArticles.length,
 		classified,
+		irrelevant,
 		retried,
 		failed,
 		auto_approved: autoApproved,
@@ -687,6 +725,7 @@ export async function runClassificationPipeline(): Promise<ClassificationRunMetr
 
 	return {
 		classified,
+		irrelevant,
 		retried,
 		failed,
 		total: rawArticles.length,

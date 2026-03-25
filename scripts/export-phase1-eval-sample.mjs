@@ -22,14 +22,14 @@ if (!Number.isFinite(sampleSize) || sampleSize <= 0) {
 
 async function fetchClassifiedArticles(limit) {
   const selects = [
-    'id,title,body,source,published_at,category,classification_confidence,classification_method,review_status,relevance_score,matched_keywords,raw_extraction',
-    'id,title,body,source,published_at,category,classification_confidence,raw_extraction'
+    'id,title,body,source,published_at,status,category,classification_confidence,classification_method,review_status,relevance_score,matched_keywords,raw_extraction',
+    'id,title,body,source,published_at,status,category,classification_confidence,raw_extraction'
   ];
 
   for (const select of selects) {
     const params = new URLSearchParams({
       select,
-      status: 'eq.classified',
+      or: '(status.eq.classified,status.eq.irrelevant)',
       order: 'published_at.desc.nullslast',
       limit: String(limit)
     });
@@ -66,8 +66,9 @@ function toReviewRecord(article) {
     title: article.title,
     body: article.body ?? null,
     source: article.source,
+    status: article.status ?? null,
     published_at: article.published_at,
-    predicted_category: article.category,
+    predicted_category: article.category ?? (article.status === 'irrelevant' ? 'not_fraud_relevant' : null),
     confidence: article.classification_confidence,
     classification_method: article.classification_method ?? null,
     review_status: article.review_status ?? null,

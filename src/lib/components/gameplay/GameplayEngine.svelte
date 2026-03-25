@@ -321,28 +321,38 @@
 	}
 
 	async function generateChallengeLink() {
-		if (isGeneratingLink) return;
+		if (isGeneratingLink || !result) return;
 		isGeneratingLink = true;
 		shareLinkText = 'Generating...';
 
 		try {
-			const res = await fetch('/api/referrals/generate', {
+			const res = await fetch('/api/challenges/create', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ mission_id: mission.id })
+				body: JSON.stringify({
+					user_id: playerId,
+					mission_id: mission.id,
+					xp_earned: result.xpEarned,
+					time_taken: MISSION_DURATION_SECONDS - result.secondsRemaining,
+					wrong_taps: result.wrongTaps,
+					clues_found: result.foundCount,
+					clues_total: mission.clues.length,
+					outcome: result.outcome
+				})
 			});
 
 			if (res.ok) {
-				const { shortLink } = await res.json() as { shortLink: string };
-				await navigator.clipboard.writeText(shortLink);
-				shareLinkText = 'Link Copied!';
+				const { code } = await res.json() as { code: string };
+				const duelUrl = `${window.location.origin}/duel/${code}`;
+				await navigator.clipboard.writeText(duelUrl);
+				shareLinkText = 'Duel Link Copied!';
 				setTimeout(() => { shareLinkText = 'Challenge a Friend'; }, 3000);
 			} else {
 				shareLinkText = 'Failed. Try again.';
 				setTimeout(() => { shareLinkText = 'Challenge a Friend'; }, 3000);
 			}
 		} catch (e) {
-			console.error('Failed to generate referral link', e);
+			console.error('Failed to generate challenge link', e);
 			shareLinkText = 'Error';
 			setTimeout(() => { shareLinkText = 'Challenge a Friend'; }, 3000);
 		} finally {
@@ -607,7 +617,13 @@
 	</div>
 
 	{#if result}
-		<section class="result-screen">
+		<section class="result-screen"
+			data-result-xp="{result.xpEarned}"
+			data-result-time="{MISSION_DURATION_SECONDS - result.secondsRemaining}"
+			data-result-wrong="{result.wrongTaps}"
+			data-result-found="{result.foundCount}"
+			data-result-outcome="{result.outcome}"
+		>
 			<div class="result-screen__hero">
 				<div>
 					<p class="label">Mission result</p>

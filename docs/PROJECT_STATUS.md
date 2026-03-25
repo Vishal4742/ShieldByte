@@ -236,4 +236,27 @@ Relevant files:
 
 If you need a short status line:
 
-`ShieldByte has working ingestion, classification, mission generation, homepage/article flows, playable web mission engine, AI feedback tutor, gamification badge system, WhatsApp bot, referral sharing system, and full profile/badges/history UI. Accuracy validation and full Google Auth are still open.`
+`ShieldByte has working ingestion, classification, mission generation, homepage/article flows, playable web mission engine, AI feedback tutor, gamification badge system, WhatsApp bot, referral sharing system, full profile/badges/history UI, and multiplayer challenge mode. Accuracy validation and full Google Auth are still open.`
+
+### Multiplayer Challenge Mode (Completed)
+
+> **Author:** Antigravity
+
+Implemented:
+- `challenges` table for storing head-to-head duel data (DB migration 012)
+- `POST /api/challenges/create` — creates challenge room with challenger's score
+- `POST /api/challenges/submit` — determines winner (XP primary, time tiebreaker)
+- `GET /api/challenges/[code]` — retrieves challenge data
+- Three-phase duel page at `/duel/[code]` (landing → playing → results with head-to-head comparison)
+- Updated GameplayEngine "Challenge a Friend" to use multiplayer challenges API
+- Data attributes on result screen for duel page score detection
+
+Relevant files:
+- `supabase/migrations/012_add_challenges.sql`
+- `src/routes/api/challenges/create/+server.ts`
+- `src/routes/api/challenges/submit/+server.ts`
+- `src/routes/api/challenges/[code]/+server.ts`
+- `src/routes/duel/[code]/+page.server.ts`
+- `src/routes/duel/[code]/+page.svelte`
+- `src/lib/components/gameplay/GameplayEngine.svelte`
+

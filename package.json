@@ -12,6 +12,7 @@
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"eval:phase1:export": "node --env-file=.env scripts/export-phase1-eval-sample.mjs",
 		"eval:phase1:score": "node scripts/evaluate-phase1-accuracy.mjs",
+		"eval:phase1:gate": "node scripts/estimate-phase1-gated-accuracy.mjs",
 		"train:phase1:model": "node scripts/train-phase1-ml-model.mjs",
 		"verify:phase1:live": "node --env-file=.env scripts/verify-phase1-live.mjs"
 	},

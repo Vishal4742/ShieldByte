@@ -237,9 +237,9 @@
 		border: 1px solid var(--panel-border);
 		border-radius: 1.35rem;
 		background:
-			radial-gradient(circle at top right, rgba(255, 255, 255, 0.06), transparent 22%),
-			radial-gradient(circle at bottom left, rgba(237, 161, 103, 0.08), transparent 18%),
-			linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.015)),
+			radial-gradient(circle at top right, rgba(255, 255, 255, 0.12), transparent 22%),
+			radial-gradient(circle at bottom left, rgba(237, 161, 103, 0.1), transparent 18%),
+			linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.06)),
 			var(--surface-1);
 		box-shadow: var(--shadow-hud);
 		overflow: hidden;
@@ -303,7 +303,7 @@
 		padding: 0.7rem 0.8rem 0.8rem;
 		border: 1px solid rgba(10, 10, 10, 0.08);
 		border-radius: 0.95rem;
-		background: rgba(255, 255, 255, 0.05);
+		background: rgba(255, 255, 255, 0.12);
 	}
 
 	.mission-queue__scoreboard strong {
@@ -353,7 +353,7 @@
 	}
 
 	.mission-queue__control--primary {
-		background: rgba(255, 255, 255, 0.04);
+		background: rgba(255, 255, 255, 0.14);
 		color: var(--text-strong);
 		border-color: var(--line-strong);
 		border-color: transparent;
@@ -384,8 +384,8 @@
 		border: 1px solid rgba(10, 10, 10, 0.08);
 		border-radius: 1.15rem;
 		background:
-			linear-gradient(145deg, rgba(255, 255, 255, 0.04), rgba(237, 161, 103, 0.06)),
-			linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01)),
+			linear-gradient(145deg, rgba(255, 255, 255, 0.12), rgba(237, 161, 103, 0.08)),
+			linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03)),
 			var(--surface-2);
 		box-shadow: var(--shadow-hud);
 		scroll-snap-align: start;
@@ -443,7 +443,7 @@
 		padding: 0.4rem 0.68rem;
 		border: 1px solid rgba(10, 10, 10, 0.08);
 		border-radius: 999px;
-		background: rgba(255, 255, 255, 0.05);
+		background: rgba(255, 255, 255, 0.12);
 		color: var(--text-strong);
 		font-size: 0.74rem;
 	}
@@ -465,7 +465,7 @@
 
 	.mission-card__actions a:first-child {
 		border-color: transparent;
-		background: rgba(255, 255, 255, 0.04);
+		background: rgba(255, 255, 255, 0.14);
 		color: var(--text-strong);
 		border-color: var(--line-strong);
 	}

@@ -89,9 +89,9 @@
 		border: 1px solid var(--panel-border);
 		border-radius: 1.2rem;
 		background:
-			linear-gradient(140deg, rgba(255, 255, 255, 0.05), transparent 35%),
-			radial-gradient(circle at bottom right, rgba(237, 161, 103, 0.06), transparent 22%),
-			linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01)),
+			linear-gradient(140deg, rgba(255, 255, 255, 0.12), transparent 35%),
+			radial-gradient(circle at bottom right, rgba(237, 161, 103, 0.08), transparent 22%),
+			linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03)),
 			var(--surface-1);
 		min-height: 100%;
 		box-shadow: var(--shadow-hud);
@@ -166,7 +166,7 @@
 
 	.threat-card__body p {
 		margin: 0.8rem 0 0;
-		color: rgba(10, 10, 10, 0.82);
+		color: var(--text-soft);
 		line-height: 1.75;
 	}
 
@@ -186,7 +186,7 @@
 
 	.threat-card__tags li {
 		padding: 0.45rem 0.75rem;
-		background: rgba(255, 255, 255, 0.05);
+		background: rgba(255, 255, 255, 0.12);
 		border: 1px solid rgba(255, 255, 255, 0.12);
 		border-radius: 999px;
 		color: var(--text-strong);

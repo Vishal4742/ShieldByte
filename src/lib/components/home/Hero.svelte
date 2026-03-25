@@ -129,9 +129,9 @@
 		border: 1px solid var(--panel-border);
 		border-radius: 1.4rem;
 		background:
-			radial-gradient(circle at top left, rgba(255, 255, 255, 0.08), transparent 24%),
-			radial-gradient(circle at bottom right, rgba(237, 161, 103, 0.08), transparent 22%),
-			linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.015)),
+			radial-gradient(circle at top left, rgba(255, 255, 255, 0.14), transparent 24%),
+			radial-gradient(circle at bottom right, rgba(237, 161, 103, 0.1), transparent 22%),
+			linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.06)),
 			var(--surface-1);
 		backdrop-filter: blur(18px);
 		overflow: hidden;
@@ -142,7 +142,7 @@
 		content: '';
 		position: absolute;
 		inset: 0.8rem;
-		border: 1px solid rgba(10, 10, 10, 0.08);
+		border: 1px solid rgba(20, 34, 45, 0.1);
 		border-radius: 1rem;
 		pointer-events: none;
 	}
@@ -178,7 +178,7 @@
 		padding: 0.45rem 0.7rem;
 		border-radius: 0.8rem;
 		border: 1px solid rgba(255, 255, 255, 0.14);
-		background: rgba(255, 255, 255, 0.04);
+		background: rgba(255, 255, 255, 0.12);
 		font-family: var(--font-mono);
 		font-size: 0.72rem;
 		letter-spacing: 0.14em;
@@ -215,7 +215,7 @@
 		margin: 0;
 		font-size: 1.02rem;
 		line-height: 1.8;
-		color: rgba(10, 10, 10, 0.82);
+		color: var(--text-soft);
 	}
 
 	.hero__actions {
@@ -248,7 +248,7 @@
 	}
 
 	.hero__primary {
-		background: rgba(255, 255, 255, 0.03);
+		background: rgba(255, 255, 255, 0.14);
 		color: var(--text-strong);
 		border: 1px solid var(--panel-border);
 		border-radius: 0.95rem;
@@ -259,7 +259,7 @@
 		border: 1px solid var(--panel-border);
 		border-radius: 0.95rem;
 		color: var(--text-strong);
-		background: transparent;
+		background: rgba(255, 255, 255, 0.08);
 	}
 
 	.hero__loop {
@@ -272,7 +272,7 @@
 	.hero__loop article,
 	.hero__ticker article {
 		padding: 0.95rem;
-		border: 1px solid rgba(10, 10, 10, 0.08);
+		border: 1px solid rgba(20, 34, 45, 0.1);
 		border-radius: 1rem;
 		background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.03));
 	}
@@ -301,8 +301,8 @@
 		border: 1px solid rgba(10, 10, 10, 0.08);
 		border-radius: 1.1rem;
 		background:
-			radial-gradient(circle at top right, rgba(255, 255, 255, 0.06), transparent 26%),
-			linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.015)),
+			radial-gradient(circle at top right, rgba(255, 255, 255, 0.12), transparent 26%),
+			linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.06)),
 			var(--surface-2);
 	}
 
@@ -338,7 +338,7 @@
 		padding: 1rem;
 		border: 1px solid rgba(10, 10, 10, 0.08);
 		border-radius: 1rem;
-		background: rgba(255, 255, 255, 0.025);
+		background: rgba(255, 255, 255, 0.14);
 	}
 
 	.preview-card__sender {
@@ -363,9 +363,9 @@
 		align-items: center;
 		justify-content: center;
 		min-height: 3rem;
-		border: 1px solid rgba(10, 10, 10, 0.1);
+		border: 1px solid rgba(20, 34, 45, 0.12);
 		border-radius: 0.95rem;
-		background: rgba(255, 255, 255, 0.05);
+		background: rgba(255, 255, 255, 0.12);
 		color: var(--text-strong);
 		text-decoration: none;
 		font-family: var(--font-mono);
@@ -375,7 +375,7 @@
 	}
 
 	.preview-card__choice--danger {
-		background: rgba(255, 255, 255, 0.04);
+		background: rgba(255, 255, 255, 0.14);
 		border-color: var(--line-strong);
 		color: var(--text-strong);
 	}

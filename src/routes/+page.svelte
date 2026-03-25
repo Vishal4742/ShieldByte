@@ -88,8 +88,8 @@
 		border: 1px solid var(--panel-border);
 		border-radius: 1.35rem;
 		background:
-			radial-gradient(circle at top right, rgba(230, 57, 70, 0.08), transparent 24%),
-			linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02)),
+			radial-gradient(circle at top right, rgba(255, 255, 255, 0.16), transparent 24%),
+			linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.08)),
 			var(--surface-1);
 		box-shadow: 0 18px 42px rgba(0, 0, 0, 0.18);
 	}

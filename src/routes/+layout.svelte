@@ -47,15 +47,15 @@
 		--font-body: 'Cormorant Garamond', serif;
 		--font-mono: 'JetBrains Mono', monospace;
 		--surface-0: #000000;
-		--surface-1: rgba(255, 255, 255, 0.025);
-		--surface-2: rgba(255, 255, 255, 0.04);
-		--surface-3: rgba(255, 255, 255, 0.06);
-		--line-soft: rgba(255, 255, 255, 0.15);
-		--line-strong: rgba(255, 255, 255, 0.4);
-		--panel-border: rgba(255, 255, 255, 0.15);
-		--text-strong: #162632;
-		--text-soft: rgba(22, 38, 50, 0.8);
-		--text-muted: rgba(22, 38, 50, 0.58);
+		--surface-1: rgba(246, 240, 231, 0.62);
+		--surface-2: rgba(244, 237, 227, 0.74);
+		--surface-3: rgba(241, 232, 220, 0.82);
+		--line-soft: rgba(22, 38, 50, 0.12);
+		--line-strong: rgba(22, 38, 50, 0.28);
+		--panel-border: rgba(22, 38, 50, 0.14);
+		--text-strong: #14222d;
+		--text-soft: rgba(20, 34, 45, 0.82);
+		--text-muted: rgba(20, 34, 45, 0.62);
 		--text-inverse-strong: rgba(255, 255, 255, 0.92);
 		--text-inverse-soft: rgba(255, 255, 255, 0.68);
 		--text-inverse-muted: rgba(255, 255, 255, 0.46);
@@ -77,11 +77,11 @@
 		background:
 			linear-gradient(
 				180deg,
-				#324654 0%,
-				#718593 32%,
-				#d0d1ce 55%,
-				#eda167 78%,
-				#d46128 100%
+				#f0a56e 0%,
+				#eda167 24%,
+				#e58c56 52%,
+				#d46128 78%,
+				#b8431d 100%
 			);
 		color: var(--text-strong);
 		font-family: var(--font-body);

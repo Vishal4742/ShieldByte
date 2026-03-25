@@ -8,6 +8,8 @@ const ATTEMPT_OUTCOMES = ['success', 'timeout', 'failed'] as const;
 export const MissionAttemptSchema = z.object({
 	user_id: z.string().trim().min(1),
 	mission_id: z.number().int().positive(),
+	judgment_choice: z.enum(['scam', 'safe']).nullable().optional(),
+	judgment_correct: z.boolean().nullable().optional(),
 	xp_earned: z.number().int().min(0),
 	base_xp: z.number().int().min(0).default(0),
 	speed_bonus: z.number().int().min(0).default(0),
@@ -89,6 +91,8 @@ export async function recordMissionAttempt(payload: MissionAttemptPayload) {
 		.insert({
 			user_id: payload.user_id,
 			mission_id: payload.mission_id,
+			judgment_choice: payload.judgment_choice ?? null,
+			judgment_correct: payload.judgment_correct ?? null,
 			xp_earned: payload.xp_earned,
 			clues_found: payload.clues_found,
 			clues_missed: payload.clues_missed,
@@ -126,6 +130,8 @@ export async function recordMissionAttempt(payload: MissionAttemptPayload) {
 		metadata: {
 			mission_id: payload.mission_id,
 			outcome: payload.outcome,
+			judgment_choice: payload.judgment_choice ?? null,
+			judgment_correct: payload.judgment_correct ?? null,
 			seconds_remaining: payload.seconds_remaining,
 			wrong_taps: payload.wrong_taps
 		}

@@ -1,7 +1,18 @@
 <script lang="ts">
+	import { browser } from '$app/environment';
 	import favicon from '$lib/assets/favicon.svg';
 
 	let { children } = $props();
+	let profileHref = $state('/profile');
+
+	$effect(() => {
+		if (!browser) {
+			return;
+		}
+
+		const playerId = localStorage.getItem('shieldbyte:player-id');
+		profileHref = playerId ? `/profile?user_id=${encodeURIComponent(playerId)}` : '/profile';
+	});
 </script>
 
 <svelte:head>
@@ -26,7 +37,7 @@
 	<div class="global-nav__links">
 		<a href="/" class="global-nav__link">Home</a>
 		<a href="/play" class="global-nav__link">Play</a>
-		<a href="/profile" class="global-nav__link">Profile</a>
+		<a href={profileHref} class="global-nav__link">Profile</a>
 	</div>
 
 	<div class="global-nav__status">

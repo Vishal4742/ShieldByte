@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { PageData } from './$types';
+	import { formatPublishedDate } from '$lib/formatters/date.js';
 
 	let { data }: { data: PageData } = $props();
 	const article = $derived(data.article);
@@ -23,15 +24,6 @@
 		upfront_fee: 'Upfront Fee',
 		signal: 'Signal'
 	};
-
-	function formatDate(value: string | null): string {
-		if (!value) return 'No publish date';
-		return new Intl.DateTimeFormat('en-IN', {
-			day: '2-digit',
-			month: 'short',
-			year: 'numeric'
-		}).format(new Date(value));
-	}
 
 	function formatConfidence(value: number | null): string {
 		if (value === null) return 'N/A';
@@ -68,7 +60,7 @@
 			</article>
 			<article>
 				<span class="mono-label">Published</span>
-				<strong>{formatDate(article.publishedAt)}</strong>
+				<strong>{formatPublishedDate(article.publishedAt)}</strong>
 			</article>
 			<article>
 				<span class="mono-label">Classifier read</span>
@@ -197,9 +189,9 @@
 	}
 
 	.dossier-hero {
-		display: grid;
-		grid-template-columns: minmax(0, 1.25fr) minmax(18rem, 0.75fr);
-		gap: 1rem;
+		display: flex;
+		flex-direction: column;
+		gap: 1.25rem;
 		padding: 1.25rem;
 	}
 
@@ -266,7 +258,7 @@
 
 	.dossier-hero__meta {
 		display: grid;
-		grid-template-columns: 1fr 1fr;
+		grid-template-columns: repeat(4, minmax(0, 1fr));
 		gap: 0.8rem;
 	}
 
@@ -360,7 +352,6 @@
 	}
 
 	@media (max-width: 980px) {
-		.dossier-hero,
 		.dossier-grid,
 		.clue-grid,
 		.field-grid {
@@ -382,7 +373,7 @@
 		}
 
 		.dossier-hero__meta {
-			grid-template-columns: 1fr;
+			grid-template-columns: 1fr 1fr;
 		}
 
 		.dossier-hero__actions {

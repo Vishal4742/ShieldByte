@@ -6,6 +6,7 @@ interface MissionRow {
 	id: number;
 	article_id: number | null;
 	fraud_type: string | null;
+	expected_verdict: string | null;
 	simulation_type: string | null;
 	sender: string | null;
 	message_body: string | null;
@@ -63,10 +64,12 @@ function normalizeClues(value: unknown): MissionClue[] {
 }
 
 function normalizeMission(row: MissionRow): ThreatMission {
+	const expectedVerdict = row.expected_verdict === 'safe' ? 'safe' : 'scam';
 	return {
 		id: row.id,
 		articleId: row.article_id,
 		fraudType: asString(row.fraud_type, 'unclassified'),
+		expectedVerdict,
 		simulationType: asString(row.simulation_type, 'message'),
 		sender: sanitizeEnglishText(row.sender, 'Unknown sender'),
 		messageBody: sanitizeEnglishText(
@@ -87,7 +90,7 @@ export async function fetchMissionForArticle(articleId: number): Promise<ThreatM
 	const { data, error } = await supabase
 		.from('missions')
 		.select(
-			'id, article_id, fraud_type, simulation_type, sender, message_body, difficulty, tip, variant, clues_json'
+			'id, article_id, fraud_type, expected_verdict, simulation_type, sender, message_body, difficulty, tip, variant, clues_json'
 		)
 		.eq('article_id', articleId)
 		.eq('status', 'active')
@@ -115,7 +118,7 @@ export async function fetchRandomActiveMission(filters?: {
 	let query = supabase
 		.from('missions')
 		.select(
-			'id, article_id, fraud_type, simulation_type, sender, message_body, difficulty, tip, variant, clues_json'
+			'id, article_id, fraud_type, expected_verdict, simulation_type, sender, message_body, difficulty, tip, variant, clues_json'
 		)
 		.eq('status', 'active');
 
@@ -145,7 +148,7 @@ export async function fetchRandomActiveMission(filters?: {
 export async function fetchMissionById(id: number): Promise<ThreatMission | null> {
 	const { data, error } = await supabase
 		.from('missions')
-		.select('id, article_id, fraud_type, simulation_type, sender, message_body, difficulty, tip, variant, clues_json')
+		.select('id, article_id, fraud_type, expected_verdict, simulation_type, sender, message_body, difficulty, tip, variant, clues_json')
 		.eq('id', id)
 		.maybeSingle();
 
@@ -186,6 +189,7 @@ export function buildFallbackMissionFromArticle(article: ThreatArticle): ThreatM
 		id: article.id,
 		articleId: article.id,
 		fraudType: article.category,
+		expectedVerdict: 'scam',
 		simulationType: 'message',
 		sender: article.source,
 		messageBody: buildFallbackMessageBody(article),

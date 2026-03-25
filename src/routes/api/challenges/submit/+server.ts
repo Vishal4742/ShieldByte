@@ -1,5 +1,9 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
 import { supabase } from '$lib/server/supabase.js';
+import {
+	getChallengesUnavailableMessage,
+	isMissingChallengesTableError
+} from '$lib/server/challenge-service.js';
 
 function determineWinner(
 	challengerXp: number,
@@ -36,7 +40,14 @@ export const POST: RequestHandler = async ({ request }) => {
 			.eq('code', code)
 			.single();
 
-		if (fetchErr || !challenge) {
+		if (fetchErr) {
+			if (isMissingChallengesTableError(fetchErr)) {
+				return json({ error: getChallengesUnavailableMessage() }, { status: 503 });
+			}
+			return json({ error: 'Failed to load challenge' }, { status: 500 });
+		}
+
+		if (!challenge) {
 			return json({ error: 'Challenge not found' }, { status: 404 });
 		}
 
@@ -74,6 +85,9 @@ export const POST: RequestHandler = async ({ request }) => {
 			.single();
 
 		if (updateErr) {
+			if (isMissingChallengesTableError(updateErr)) {
+				return json({ error: getChallengesUnavailableMessage() }, { status: 503 });
+			}
 			console.error('[challenges/submit] DB error:', updateErr);
 			return json({ error: 'Failed to submit challenge result' }, { status: 500 });
 		}

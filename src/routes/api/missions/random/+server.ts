@@ -39,6 +39,7 @@ export const GET: RequestHandler = async ({ url }) => {
 		return json({
 			id: mission.id,
 			fraud_type: mission.fraudType,
+			expected_verdict: mission.expectedVerdict,
 			simulation_type: mission.simulationType,
 			sender: mission.sender,
 			message_body: mission.messageBody,

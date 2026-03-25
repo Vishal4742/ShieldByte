@@ -95,11 +95,26 @@ let verdictChoice = $state<'scam' | 'safe' | null>(null);
 let verdictCorrect = $state<boolean | null>(null);
 let verdictProcessing = $state(false);
 const missionLabel = $derived(mission.fraudType.replaceAll('_', ' '));
+const expectedVerdictLabel = $derived(mission.expectedVerdict === 'scam' ? 'scam' : 'safe');
 const beginnerSteps = [
 	'Read the case and predict scam or safe.',
 	'Then tap the risky words or phrases.',
 	'Each wrong move costs a shield before the timer runs out.'
 ];
+const verdictStatusLabel = $derived.by(() => {
+	if (missionState === 'ready') return 'Pending';
+	if (verdictChoice === null) return 'Choose';
+	return verdictCorrect ? 'Correct' : 'Wrong';
+});
+const verdictStatusDetail = $derived.by(() => {
+	if (verdictChoice === null) {
+		return 'Call the message before clue hunting.';
+	}
+
+	return verdictCorrect
+		? `You correctly predicted this message is ${expectedVerdictLabel}.`
+		: `You predicted ${verdictChoice}, but the correct answer is ${expectedVerdictLabel}.`;
+});
 
 	const allCluesFound = $derived(foundIds.length === mission.clues.length);
 	const timerTone = $derived(secondsRemaining <= LOW_TIME_THRESHOLD_SECONDS ? 'critical' : 'steady');
@@ -214,7 +229,7 @@ async function resolveVerdict(choice: 'scam' | 'safe') {
 
 	verdictProcessing = true;
 	verdictChoice = choice;
-	const isCorrect = choice === 'scam';
+	const isCorrect = choice === mission.expectedVerdict;
 	verdictCorrect = isCorrect;
 
 	if (browser) {
@@ -235,14 +250,14 @@ async function resolveVerdict(choice: 'scam' | 'safe') {
 
 	if (isCorrect) {
 		feedbackTitle = 'Prediction recorded';
-		feedbackBody = 'You marked this case as a scam. Now lock the exact warning signs before the clock runs out.';
+		feedbackBody = `You correctly marked this case as ${mission.expectedVerdict}. Now lock the exact warning signs before the clock runs out.`;
 	} else {
 		const nextLives = consumeLife(livesState, Date.now());
 		livesState = nextLives; // Optimistic update before server call
 		wrongTaps += 1;
 		comboChain = 0;
 		feedbackTitle = 'Prediction recorded';
-		feedbackBody = 'You marked this case as safe, but it is a scam. You lost one shield, but you can still recover by finding the clues.';
+		feedbackBody = `You marked this case as ${choice}, but it is ${mission.expectedVerdict}. You lost one shield, but you can still recover by finding the clues.`;
 		await persistLives(nextLives);
 
 			if (livesState.lives <= 0) {
@@ -366,6 +381,8 @@ async function resolveVerdict(choice: 'scam' | 'safe') {
 				body: JSON.stringify({
 					user_id: playerId,
 					mission_id: mission.id,
+					judgment_choice: verdictChoice,
+					judgment_correct: verdictCorrect,
 					xp_earned: result.xpEarned,
 					base_xp: result.baseXP,
 					speed_bonus: result.speedBonus,
@@ -594,7 +611,7 @@ async function resolveVerdict(choice: 'scam' | 'safe') {
 			}
 		})();
 
-		// Load lives from server (source of truth)
+		// Load lives from the server without clobbering a round the player already started.
 		void (async () => {
 			try {
 				const res = await fetch(`/api/lives?user_id=${encodeURIComponent(playerId!)}`);
@@ -606,7 +623,10 @@ async function resolveVerdict(choice: 'scam' | 'safe') {
 				console.warn('[GameplayEngine] Failed to fetch server lives:', err);
 			}
 
-			missionState = 'ready';
+			if (missionState !== 'ready' || result || verdictChoice !== null) {
+				return;
+			}
+
 			feedbackTitle = livesState.lives > 0 ? 'Mission briefing' : 'No shields available';
 			feedbackBody =
 				livesState.lives > 0
@@ -675,22 +695,8 @@ async function resolveVerdict(choice: 'scam' | 'safe') {
 		</article>
 		<article>
 			<span class="label">Judgment</span>
-			<strong>
-				{missionState === 'ready'
-					? 'Pending'
-					: verdictChoice === null
-						? 'Choose'
-						: verdictCorrect
-							? 'Scam'
-							: 'Missed'}
-			</strong>
-			<p>
-				{verdictChoice === null
-					? 'Call the message before clue hunting.'
-					: verdictCorrect
-						? 'Correct first read.'
-						: 'Wrong call cost one shield.'}
-			</p>
+			<strong>{verdictStatusLabel}</strong>
+			<p>{verdictStatusDetail}</p>
 		</article>
 		<article>
 			<span class="label">Combo boost</span>
@@ -736,7 +742,7 @@ async function resolveVerdict(choice: 'scam' | 'safe') {
 					<div class="briefing-card__header">
 						<div>
 							<p class="label">Mission briefing</p>
-							<h3>Decide if this {missionLabel} message is a scam.</h3>
+							<h3>Decide whether this {missionLabel} message is a scam or safe.</h3>
 						</div>
 						<span>{mission.simulationType.replaceAll('_', ' ')}</span>
 					</div>
@@ -759,6 +765,17 @@ async function resolveVerdict(choice: 'scam' | 'safe') {
 						</article>
 					</div>
 					<p class="briefing-card__tip">{mission.tip}</p>
+					{#if verdictChoice !== null}
+						<div class:verdict-callout--correct={verdictCorrect} class:verdict-callout--wrong={verdictCorrect === false} class="verdict-callout">
+							<p class="label">Prediction result</p>
+							<strong>{verdictCorrect ? 'Correct prediction' : 'Wrong prediction'}</strong>
+							<p>
+								{verdictCorrect
+									? `You called this case correctly. It is ${expectedVerdictLabel}. Now find every red flag to lock in the win and save progress.`
+									: `The correct answer is ${expectedVerdictLabel}. Your prediction cost one shield. You can still finish the round and save progress to your profile.`}
+							</p>
+						</div>
+					{/if}
 					<div class="briefing-card__actions">
 						<a class="ghost-link" href="/#queue">
 							Back to mission board
@@ -1006,15 +1023,15 @@ async function resolveVerdict(choice: 'scam' | 'safe') {
 
 <style>
 	.gameplay-shell {
-		--panel: rgba(255, 255, 255, 0.03);
-		--panel-strong: rgba(255, 255, 255, 0.06);
-		--line: rgba(255, 255, 255, 0.16);
-		--line-hot: rgba(237, 161, 103, 0.4);
-		--text: #f2eee7;
-		--muted: rgba(236, 230, 219, 0.62);
-		--mint: rgba(255, 255, 255, 0.9);
+		--panel: rgba(255, 255, 255, 0.28);
+		--panel-strong: rgba(255, 255, 255, 0.18);
+		--line: rgba(10, 10, 10, 0.1);
+		--line-hot: rgba(212, 97, 40, 0.3);
+		--text: rgba(20, 34, 45, 0.96);
+		--muted: rgba(20, 34, 45, 0.68);
+		--mint: rgba(20, 34, 45, 0.92);
 		--amber: #eda167;
-		--red: #eda167;
+		--red: #d46128;
 		display: grid;
 		gap: 1rem;
 		color: var(--text);
@@ -1041,10 +1058,10 @@ async function resolveVerdict(choice: 'scam' | 'safe') {
 		border: 1px solid var(--line);
 		border-radius: 1rem;
 		background:
-			radial-gradient(circle at top right, rgba(125, 242, 201, 0.08), transparent 22%),
-			linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01)),
+			radial-gradient(circle at top right, rgba(230, 57, 70, 0.06), transparent 24%),
+			linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.12)),
 			var(--panel);
-		box-shadow: 0 22px 60px rgba(0, 0, 0, 0.26);
+		box-shadow: var(--shadow-hud);
 	}
 
 	.mission-strip,
@@ -1062,7 +1079,7 @@ async function resolveVerdict(choice: 'scam' | 'safe') {
 		border: 1px solid rgba(245, 196, 108, 0.22);
 		background:
 			radial-gradient(circle at top left, rgba(245, 196, 108, 0.12), transparent 30%),
-			linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01)),
+			linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.12)),
 			var(--panel);
 	}
 
@@ -1088,8 +1105,8 @@ async function resolveVerdict(choice: 'scam' | 'safe') {
 
 	.tutorial-strip__steps article {
 		padding: 0.95rem;
-		border: 1px solid rgba(255, 255, 255, 0.08);
-		background: rgba(255, 255, 255, 0.04);
+		border: 1px solid rgba(10, 10, 10, 0.1);
+		background: rgba(255, 255, 255, 0.18);
 	}
 
 	.tutorial-strip__steps span {
@@ -1099,8 +1116,8 @@ async function resolveVerdict(choice: 'scam' | 'safe') {
 		width: 2rem;
 		height: 2rem;
 		border-radius: 999px;
-		background: var(--mint);
-		color: #06271d;
+		background: var(--amber);
+		color: #14222d;
 		font-family: var(--font-mono, 'IBM Plex Mono', monospace);
 		font-size: 0.82rem;
 		font-weight: 700;
@@ -1169,25 +1186,40 @@ async function resolveVerdict(choice: 'scam' | 'safe') {
 		transition:
 			transform 150ms ease,
 			border-color 150ms ease,
-			background-color 150ms ease;
+			background-color 150ms ease,
+			box-shadow 150ms ease,
+			color 150ms ease;
 	}
 
 	.ghost-link,
 	.ghost-button {
-		background: transparent;
-		color: var(--text);
+		background: rgba(20, 34, 45, 0.08);
+		color: #0f1c26;
+		border-color: rgba(20, 34, 45, 0.22);
+		box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.16) inset;
 	}
 
 	.primary-action {
-		border-color: transparent;
-		background: linear-gradient(135deg, var(--amber), var(--mint));
-		color: #052018;
+		border-color: rgba(143, 59, 24, 0.22);
+		background: linear-gradient(135deg, #d46128, #eda167);
+		color: #101820;
+		box-shadow: 0 10px 24px rgba(143, 59, 24, 0.18);
 	}
 
 	.ghost-link:hover,
 	.ghost-button:hover,
 	.primary-action:hover {
 		transform: translateY(-1px);
+	}
+
+	.ghost-link:hover,
+	.ghost-button:hover {
+		background: rgba(20, 34, 45, 0.14);
+		border-color: rgba(20, 34, 45, 0.3);
+	}
+
+	.primary-action:hover {
+		box-shadow: 0 14px 28px rgba(143, 59, 24, 0.24);
 	}
 
 	.status-grid {
@@ -1221,11 +1253,11 @@ async function resolveVerdict(choice: 'scam' | 'safe') {
 	.status-grid article.critical,
 	.message-slate.critical {
 		border-color: var(--line-hot);
-		box-shadow: 0 0 0 1px rgba(255, 111, 97, 0.18), 0 0 40px rgba(255, 111, 97, 0.08);
+		box-shadow: 0 0 0 1px rgba(212, 97, 40, 0.14);
 	}
 
 	.status-grid article.critical strong {
-		color: #ffd8d4;
+		color: #8f3b18;
 	}
 
 	.play-grid {
@@ -1249,11 +1281,11 @@ async function resolveVerdict(choice: 'scam' | 'safe') {
 	}
 
 	.message-slate.flash-correct::after {
-		background: rgba(125, 242, 201, 0.12);
+		background: rgba(237, 161, 103, 0.12);
 	}
 
 	.message-slate.flash-wrong::after {
-		background: rgba(255, 111, 97, 0.12);
+		background: rgba(212, 97, 40, 0.12);
 	}
 
 	@keyframes flash {
@@ -1369,6 +1401,39 @@ async function resolveVerdict(choice: 'scam' | 'safe') {
 
 	.briefing-card__action {
 		margin-top: 0;
+	}
+
+	.verdict-callout {
+		margin-top: 1rem;
+		padding: 0.95rem 1rem;
+		border: 1px solid rgba(10, 10, 10, 0.12);
+		border-radius: 1rem;
+		background: rgba(255, 255, 255, 0.14);
+	}
+
+	.verdict-callout strong {
+		display: block;
+		margin: 0.35rem 0 0;
+		font-family: var(--font-display);
+		font-size: clamp(1.45rem, 3vw, 2rem);
+		font-weight: 500;
+		line-height: 1;
+	}
+
+	.verdict-callout p:last-child {
+		margin: 0.55rem 0 0;
+		color: var(--text);
+		line-height: 1.65;
+	}
+
+	.verdict-callout--correct {
+		border-color: rgba(125, 242, 201, 0.28);
+		background: rgba(125, 242, 201, 0.12);
+	}
+
+	.verdict-callout--wrong {
+		border-color: rgba(212, 97, 40, 0.28);
+		background: rgba(212, 97, 40, 0.12);
 	}
 
 	.briefing-card__actions {

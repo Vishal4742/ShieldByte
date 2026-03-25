@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { ThreatArticle } from '$lib/types/threat.js';
+	import { formatPublishedDate } from '$lib/formatters/date.js';
 
 	let { article, index }: { article: ThreatArticle; index: number } = $props();
 
@@ -11,16 +12,6 @@
 		investment_fraud: 'Investment Fraud',
 		customer_support_scam: 'Support Scam'
 	};
-
-	function formatDate(value: string | null): string {
-		if (!value) return 'No publish date';
-
-		return new Intl.DateTimeFormat('en-IN', {
-			day: '2-digit',
-			month: 'short',
-			year: 'numeric'
-		}).format(new Date(value));
-	}
 
 	function confidenceBand(value: number | null): string {
 		if (value === null) return 'Review';
@@ -59,7 +50,7 @@
 		</div>
 		<div>
 			<span>Date</span>
-			<strong>{formatDate(article.publishedAt)}</strong>
+			<strong>{formatPublishedDate(article.publishedAt)}</strong>
 		</div>
 	</div>
 
@@ -158,15 +149,16 @@
 	.threat-card__body h3 {
 		margin: 0;
 		font-family: var(--font-display);
-		font-size: clamp(1.8rem, 4vw, 2.5rem);
+		font-size: clamp(1.25rem, 2.4vw, 1.7rem);
 		font-weight: 700;
-		line-height: 0.96;
-		text-transform: uppercase;
+		line-height: 1.02;
+		text-transform: none;
 	}
 
 	.threat-card__body p {
 		margin: 0.8rem 0 0;
 		color: var(--text-soft);
+		font-size: 0.92rem;
 		line-height: 1.75;
 	}
 
@@ -238,7 +230,7 @@
 
 	@media (max-width: 480px) {
 		.threat-card__body h3 {
-			font-size: 1.65rem;
+			font-size: 1.15rem;
 		}
 
 		.threat-card__tags li {

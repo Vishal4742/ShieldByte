@@ -56,6 +56,11 @@
 		if (outcome === 'failed') return 'outcome--failed';
 		return 'outcome--timeout';
 	}
+
+	function judgmentLabel(choice: string | null, correct: boolean | null): string {
+		if (!choice) return 'N/A';
+		return correct ? `${choice} / correct` : `${choice} / wrong`;
+	}
 </script>
 
 <svelte:head>
@@ -106,7 +111,7 @@
 			</article>
 			<article>
 				<span class="mono-label">Last active</span>
-				<strong>{formatDate(profile.stats.last_mission_date)}</strong>
+				<strong>{formatDate(profile.stats.last_mission_at)}</strong>
 				<p>latest mission</p>
 			</article>
 		</section>
@@ -155,6 +160,7 @@
 					<div class="history-table__header">
 						<span>Mission</span>
 						<span>Outcome</span>
+						<span>Judgment</span>
 						<span>XP</span>
 						<span>Clues</span>
 						<span>Time</span>
@@ -166,6 +172,7 @@
 							<span class="history-row__outcome {outcomeClass(attempt.outcome)}">
 								{outcomeLabel(attempt.outcome)}
 							</span>
+							<span>{judgmentLabel(attempt.judgment_choice, attempt.judgment_correct)}</span>
 							<span class="history-row__xp">+{attempt.xp_earned}</span>
 							<span>{attempt.clues_found}/{attempt.clues_found + attempt.clues_missed}</span>
 							<span>{attempt.time_taken}s</span>
@@ -387,7 +394,7 @@
 	.history-table__header,
 	.history-row {
 		display: grid;
-		grid-template-columns: 80px 110px 80px 80px 70px 1fr;
+		grid-template-columns: 80px 110px 140px 80px 80px 70px 1fr;
 		gap: 0.8rem;
 		padding: 0.9rem 1rem;
 		align-items: center;
@@ -503,11 +510,15 @@
 
 		.history-table {
 			overflow-x: auto;
+			-webkit-overflow-scrolling: touch;
+			margin: 0 -1rem;
 		}
 
 		.history-table__header,
 		.history-row {
-			min-width: 42rem;
+			min-width: 44rem;
+			padding-left: 1rem;
+			padding-right: 1rem;
 		}
 
 		.quick-links {

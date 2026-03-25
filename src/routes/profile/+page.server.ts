@@ -7,7 +7,7 @@ export const load: PageServerLoad = async ({ url }) => {
 
 	// Default empty profile for guests
 	const emptyProfile = {
-		stats: { total_xp: 0, rank: 'Rookie', streak_days: 0, last_mission_date: null, missions_completed: 0 },
+		stats: { total_xp: 0, rank: 'Rookie Agent', streak_days: 0, last_mission_at: null, missions_completed: 0 },
 		badges: BADGE_DEFINITIONS.map((b) => ({
 			id: b.id,
 			name: b.name,
@@ -28,7 +28,7 @@ export const load: PageServerLoad = async ({ url }) => {
 		// 1. Fetch user stats
 		const { data: stats } = await supabase
 			.from('user_stats')
-			.select('total_xp, rank, streak_days, last_mission_date, missions_completed')
+			.select('total_xp, rank, streak_days, last_mission_at')
 			.eq('user_id', userId)
 			.maybeSingle();
 
@@ -51,17 +51,26 @@ export const load: PageServerLoad = async ({ url }) => {
 			earnedAt: earnedMap.get(b.id) ?? null
 		}));
 
+		const { count: missionCount } = await supabase
+			.from('mission_attempts')
+			.select('*', { count: 'exact', head: true })
+			.eq('user_id', userId);
+
 		// 3. Recent mission attempts
 		const { data: attempts } = await supabase
 			.from('mission_attempts')
-			.select('id, mission_id, outcome, xp_earned, wrong_taps, time_taken, clues_found, clues_missed, completed_at')
+			.select('id, mission_id, outcome, judgment_choice, judgment_correct, xp_earned, wrong_taps, time_taken, clues_found, clues_missed, completed_at')
 			.eq('user_id', userId)
 			.order('completed_at', { ascending: false })
 			.limit(20);
 
 		return {
 			profile: {
-				stats: stats ?? emptyProfile.stats,
+				stats: {
+					...emptyProfile.stats,
+					...(stats ?? {}),
+					missions_completed: missionCount ?? 0
+				},
 				badges,
 				recentAttempts: attempts ?? []
 			},

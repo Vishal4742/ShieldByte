@@ -10,6 +10,7 @@ export interface ThreatMission {
 	id: number;
 	articleId: number | null;
 	fraudType: string;
+	expectedVerdict: 'scam' | 'safe';
 	simulationType: string;
 	sender: string;
 	messageBody: string;

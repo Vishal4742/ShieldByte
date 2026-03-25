@@ -31,9 +31,9 @@ export async function GET({ url }: RequestEvent) {
 		// 3. Fetch recent mission attempts
 		const { data: recentAttempts, error: attemptsError } = await supabase
 			.from('mission_attempts')
-			.select('mission_id, status, xp_earned, wrong_taps, time_taken, created_at')
+			.select('mission_id, outcome, xp_earned, wrong_taps, time_taken, completed_at')
 			.eq('user_id', userId)
-			.order('created_at', { ascending: false })
+			.order('completed_at', { ascending: false })
 			.limit(10);
 
 		if (attemptsError) throw attemptsError;
@@ -43,12 +43,20 @@ export async function GET({ url }: RequestEvent) {
 				stats: stats || {
 					user_id: userId,
 					total_xp: 0,
-					rank: 'Rookie',
+					rank: 'Rookie Agent',
 					streak_days: 0,
-					last_mission_date: null
+					last_mission_at: null
 				},
 				badges: badgesData || [],
-				recent_attempts: recentAttempts || []
+				recent_attempts:
+					recentAttempts?.map((attempt) => ({
+						mission_id: attempt.mission_id,
+						status: attempt.outcome,
+						xp_earned: attempt.xp_earned,
+						wrong_taps: attempt.wrong_taps,
+						time_taken: attempt.time_taken,
+						created_at: attempt.completed_at
+					})) || []
 			}
 		});
 	} catch (error) {

@@ -60,24 +60,11 @@
 	}
 
 	.play-shell__grid {
-		position: fixed;
-		inset: 0;
-		pointer-events: none;
-		opacity: 0.08;
-		background-image:
-			linear-gradient(rgba(10, 10, 10, 0.12) 1px, transparent 1px),
-			linear-gradient(90deg, rgba(230, 57, 70, 0.08) 1px, transparent 1px);
-		background-size: 88px 88px;
+		display: none;
 	}
 
 	.play-shell__glow {
-		position: fixed;
-		width: 18rem;
-		height: 18rem;
-		border-radius: 999px;
-		filter: blur(120px);
-		pointer-events: none;
-		opacity: 0.08;
+		display: none;
 	}
 
 	.play-shell__glow--mint {
@@ -102,8 +89,12 @@
 		align-items: end;
 		padding: 1rem clamp(1.2rem, 4vw, 3rem) 0.9rem;
 		backdrop-filter: blur(18px);
-		background: linear-gradient(180deg, rgba(248, 248, 245, 0.9), rgba(244, 244, 242, 0.58));
-		border-bottom: 1px solid rgba(10, 10, 10, 0.08);
+		background:
+			radial-gradient(circle at top right, rgba(230, 57, 70, 0.06), transparent 24%),
+			linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.12)),
+			var(--surface-1);
+		border-bottom: 1px solid rgba(10, 10, 10, 0.1);
+		box-shadow: var(--shadow-hud);
 	}
 
 	.play-head p,
@@ -134,7 +125,7 @@
 		padding: 0.5rem 0.7rem;
 		border: 1px solid rgba(10, 10, 10, 0.1);
 		border-radius: 999px;
-		background: rgba(255, 255, 255, 0.24);
+		background: rgba(255, 255, 255, 0.18);
 		color: var(--text-soft);
 	}
 

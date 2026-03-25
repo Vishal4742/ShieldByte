@@ -105,6 +105,53 @@ export interface FeedbackResult {
 	encouragement: string;
 }
 
+function summarizePatterns(clues: FeedbackClue[]): string {
+	if (clues.length === 0) {
+		return 'overall scam recognition';
+	}
+
+	const priorityTypes = ['urgency', 'fake_authority', 'credential_request', 'too_good', 'upfront_fee'];
+	const topType =
+		priorityTypes.find((type) => clues.some((clue) => clue.type === type)) ?? clues[0]?.type ?? 'signal';
+
+	return topType.replaceAll('_', ' ');
+}
+
+function buildFallbackFeedback(params: GenerateFeedbackParams): FeedbackResult {
+	const missedClue = params.cluesMissed[0];
+	const foundClue = params.cluesFound[0];
+	const patternIdentified = summarizePatterns(params.cluesMissed);
+	const feedbackParts: string[] = [];
+
+	if (missedClue) {
+		feedbackParts.push(
+			`You missed the warning sign "${missedClue.triggerText}", which usually points to ${patternIdentified}.`
+		);
+	}
+
+	if (params.cluesMissed.length > 1) {
+		feedbackParts.push(
+			`There were ${params.cluesMissed.length} missed clues, so slow the message down and verify each pressure point one by one.`
+		);
+	} else if (foundClue) {
+		feedbackParts.push(`You still spotted "${foundClue.triggerText}", so your read was partly on track.`);
+	} else {
+		feedbackParts.push('Take a second pass through the message before trusting any request, promise, or deadline.');
+	}
+
+	return {
+		feedbackText: feedbackParts.join(' '),
+		patternIdentified,
+		actionableTip: missedClue
+			? `Pause when you see "${missedClue.triggerText}" and verify the sender elsewhere.`
+			: 'Pause before acting and verify the sender through an official channel.',
+		encouragement:
+			params.cluesFound.length > 0
+				? 'You already caught part of the pattern. Keep building that habit.'
+				: 'One careful reread can prevent most scam mistakes.'
+	};
+}
+
 // ─── Prompt Construction ────────────────────────────────────
 
 const SYSTEM_PROMPT = `You are an empathetic cybersecurity educator. Your job is to help everyday people learn to spot scams. You speak like a friendly mentor, not a lecturer. Use simple language. Never be condescending.`;
@@ -178,13 +225,17 @@ export async function generateFeedback(params: GenerateFeedbackParams): Promise<
 	}
 
 	if (!rawJson) {
-		rawJson = await generateGeminiJson({
-			model,
-			systemPrompt: SYSTEM_PROMPT,
-			userPrompt,
-			temperature: 0.4,
-			maxOutputTokens: 512
-		});
+		try {
+			rawJson = await generateGeminiJson({
+				model,
+				systemPrompt: SYSTEM_PROMPT,
+				userPrompt,
+				temperature: 0.4,
+				maxOutputTokens: 512
+			});
+		} catch (err) {
+			console.error(`[feedback-engine] Gemini API error for ${model}:`, err);
+		}
 	}
 
 	if (!rawJson && ollamaModel) {
@@ -203,21 +254,19 @@ export async function generateFeedback(params: GenerateFeedbackParams): Promise<
 	}
 
 	if (!rawJson) {
-		throw new Error('No configured local or hosted model returned feedback JSON.');
+		return buildFallbackFeedback(params);
 	}
 
 	let parsed: unknown;
 	try {
 		parsed = parseJsonObjectLoose(rawJson);
 	} catch {
-		throw new Error(`Failed to parse Gemini feedback response as JSON: ${rawJson.slice(0, 200)}`);
+		return buildFallbackFeedback(params);
 	}
 
 	const validated = FeedbackResponseSchema.safeParse(parsed);
 	if (!validated.success) {
-		throw new Error(
-			`Feedback response failed validation: ${validated.error.issues[0]?.message ?? 'unknown'}`
-		);
+		return buildFallbackFeedback(params);
 	}
 
 	const feedback: FeedbackResult = {

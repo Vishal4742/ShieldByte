@@ -52,6 +52,7 @@ const MissionClueSchema = z.object({
 });
 
 const MissionSchema = z.object({
+	expected_verdict: z.enum(['scam', 'safe']).default('scam'),
 	simulation_type: z.enum(['SMS', 'WhatsApp_message', 'email', 'call_transcript']),
 	sender: z.string().min(1),
 	message_body: z.string().min(20),
@@ -269,6 +270,7 @@ function buildGenerationPrompt(fraudData: Record<string, unknown>, variantNum: n
 
 Return ONLY a JSON object:
 {
+  "expected_verdict": "scam",
   "simulation_type": "SMS | WhatsApp_message | email | call_transcript",
   "sender": "fake sender name or number (realistic, e.g. 'HDFCBK' or '+91-9876543210' or 'hr@amazzon-careers.in')",
   "message_body": "the full scam message text exactly as a user would receive it. MUST be written entirely in English — no Hindi or Hinglish.",
@@ -490,6 +492,7 @@ async function persistGeneratedMission(record: GeneratedMissionRecord): Promise<
 	const { error } = await supabase.from('missions').insert({
 		article_id: record.article_id,
 		fraud_type: record.fraud_type,
+		expected_verdict: record.expected_verdict,
 		simulation_type: record.simulation_type,
 		simulation_html: record.simulation_html,
 		sender: record.sender,

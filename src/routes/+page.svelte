@@ -101,10 +101,10 @@
 	.section-heading h2 {
 		margin: 0.35rem 0 0;
 		font-family: var(--font-display);
-		font-size: clamp(2.2rem, 5vw, 3.9rem);
+		font-size: clamp(1.35rem, 2.6vw, 2rem);
 		font-weight: 700;
-		line-height: 0.94;
-		text-transform: uppercase;
+		line-height: 1.05;
+		text-transform: none;
 	}
 
 	.section-heading--row {
@@ -167,7 +167,7 @@
 		}
 
 		.section-heading h2 {
-			font-size: clamp(1.9rem, 9vw, 2.6rem);
+			font-size: clamp(1.15rem, 5.5vw, 1.45rem);
 		}
 
 		.feed-panel__hint {

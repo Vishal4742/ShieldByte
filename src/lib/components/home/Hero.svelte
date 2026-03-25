@@ -25,6 +25,12 @@
 			: 0
 	);
 	const featuredCase = $derived(articles[0] ?? null);
+	const featuredPlayHref = $derived(
+		featuredCase
+			? `/play?article=${featuredCase.id}&type=${encodeURIComponent(featuredCase.category)}`
+			: '/play'
+	);
+	const featuredArticleHref = $derived(featuredCase ? `/articles/${featuredCase.id}` : '#queue');
 	const liveOps = $derived([
 		{ label: 'Live cases', value: String(articles.length).padStart(2, '0') },
 		{ label: 'Sources', value: String(uniqueSources).padStart(2, '0') },
@@ -51,7 +57,7 @@
 
 		<div class="hero__actions">
 			<a href="/play" class="hero__primary">Play first round</a>
-			<a href="#queue" class="hero__secondary">Browse missions</a>
+			<a href="#queue" class="hero__secondary">Open mission queue</a>
 		</div>
 
 		<div class="hero__loop">
@@ -88,8 +94,12 @@
 			</div>
 
 			<div class="preview-card__choices">
-				<button type="button" class="preview-card__choice preview-card__choice--danger">Scam</button>
-				<button type="button" class="preview-card__choice">Safe</button>
+				<a href={featuredPlayHref} class="preview-card__choice preview-card__choice--danger">
+					Play this case
+				</a>
+				<a href={featuredArticleHref} class="preview-card__choice">
+					Read dossier
+				</a>
 			</div>
 
 			<div class="hero__ticker">
@@ -119,9 +129,9 @@
 		border: 1px solid var(--panel-border);
 		border-radius: 1.4rem;
 		background:
-			radial-gradient(circle at top left, rgba(66, 199, 255, 0.17), transparent 24%),
-			radial-gradient(circle at bottom right, rgba(87, 255, 214, 0.08), transparent 20%),
-			linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.01)),
+			radial-gradient(circle at top left, rgba(255, 255, 255, 0.08), transparent 24%),
+			radial-gradient(circle at bottom right, rgba(237, 161, 103, 0.08), transparent 22%),
+			linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.015)),
 			var(--surface-1);
 		backdrop-filter: blur(18px);
 		overflow: hidden;
@@ -132,7 +142,7 @@
 		content: '';
 		position: absolute;
 		inset: 0.8rem;
-		border: 1px solid rgba(130, 191, 255, 0.08);
+		border: 1px solid rgba(10, 10, 10, 0.08);
 		border-radius: 1rem;
 		pointer-events: none;
 	}
@@ -167,8 +177,8 @@
 		gap: 0.55rem;
 		padding: 0.45rem 0.7rem;
 		border-radius: 0.8rem;
-		border: 1px solid rgba(87, 255, 214, 0.16);
-		background: rgba(87, 255, 214, 0.08);
+		border: 1px solid rgba(255, 255, 255, 0.14);
+		background: rgba(255, 255, 255, 0.04);
 		font-family: var(--font-mono);
 		font-size: 0.72rem;
 		letter-spacing: 0.14em;
@@ -181,7 +191,7 @@
 		height: 0.5rem;
 		border-radius: 999px;
 		background: var(--accent-lime);
-		box-shadow: 0 0 14px rgba(180, 255, 82, 0.9);
+		box-shadow: 0 0 14px rgba(237, 161, 103, 0.42);
 		animation: pulse 1.7s ease-in-out infinite;
 	}
 
@@ -197,7 +207,7 @@
 	h1 span {
 		display: inline-block;
 		color: var(--accent-soft);
-		text-shadow: 0 0 24px rgba(66, 199, 255, 0.34);
+		text-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
 	}
 
 	.hero__lede {
@@ -238,17 +248,18 @@
 	}
 
 	.hero__primary {
-		background: linear-gradient(135deg, var(--accent-cyan), var(--accent-mint));
-		color: #07131f;
+		background: rgba(255, 255, 255, 0.03);
+		color: var(--text-strong);
+		border: 1px solid var(--panel-border);
 		border-radius: 0.95rem;
-		box-shadow: 0 18px 32px rgba(66, 199, 255, 0.22);
+		box-shadow: none;
 	}
 
 	.hero__secondary {
-		border: 1px solid var(--line-strong);
+		border: 1px solid var(--panel-border);
 		border-radius: 0.95rem;
 		color: var(--text-strong);
-		background: rgba(255, 255, 255, 0.03);
+		background: transparent;
 	}
 
 	.hero__loop {
@@ -261,9 +272,9 @@
 	.hero__loop article,
 	.hero__ticker article {
 		padding: 0.95rem;
-		border: 1px solid rgba(130, 191, 255, 0.12);
+		border: 1px solid rgba(10, 10, 10, 0.08);
 		border-radius: 1rem;
-		background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
+		background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.03));
 	}
 
 	.hero__loop span {
@@ -272,7 +283,7 @@
 		width: 1.8rem;
 		height: 1.8rem;
 		border-radius: 999px;
-		background: rgba(66, 199, 255, 0.12);
+		background: rgba(255, 255, 255, 0.06);
 		color: var(--accent-soft);
 	}
 
@@ -287,11 +298,11 @@
 		gap: 1rem;
 		height: 100%;
 		padding: 1.2rem;
-		border: 1px solid rgba(130, 191, 255, 0.12);
+		border: 1px solid rgba(10, 10, 10, 0.08);
 		border-radius: 1.1rem;
 		background:
-			radial-gradient(circle at top right, rgba(66, 199, 255, 0.12), transparent 26%),
-			linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02)),
+			radial-gradient(circle at top right, rgba(255, 255, 255, 0.06), transparent 26%),
+			linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.015)),
 			var(--surface-2);
 	}
 
@@ -314,20 +325,20 @@
 	.preview-card__status {
 		padding: 0.45rem 0.7rem;
 		border-radius: 999px;
-		border: 1px solid rgba(180, 255, 82, 0.24);
-		background: rgba(180, 255, 82, 0.08);
+		border: 1px solid rgba(255, 255, 255, 0.14);
+		background: transparent;
 		font-family: var(--font-mono);
 		font-size: 0.68rem;
 		letter-spacing: 0.14em;
 		text-transform: uppercase;
-		color: #dbffaf;
+		color: var(--text-soft);
 	}
 
 	.preview-card__message {
 		padding: 1rem;
-		border: 1px solid rgba(130, 191, 255, 0.1);
+		border: 1px solid rgba(10, 10, 10, 0.08);
 		border-radius: 1rem;
-		background: rgba(2, 8, 18, 0.7);
+		background: rgba(255, 255, 255, 0.025);
 	}
 
 	.preview-card__sender {
@@ -348,11 +359,15 @@
 	}
 
 	.preview-card__choice {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
 		min-height: 3rem;
-		border: 1px solid rgba(130, 191, 255, 0.14);
+		border: 1px solid rgba(10, 10, 10, 0.1);
 		border-radius: 0.95rem;
-		background: rgba(255, 255, 255, 0.03);
+		background: rgba(255, 255, 255, 0.05);
 		color: var(--text-strong);
+		text-decoration: none;
 		font-family: var(--font-mono);
 		font-size: 0.72rem;
 		letter-spacing: 0.16em;
@@ -360,8 +375,9 @@
 	}
 
 	.preview-card__choice--danger {
-		background: linear-gradient(135deg, rgba(255, 107, 107, 0.18), rgba(255, 207, 90, 0.12));
-		border-color: rgba(255, 107, 107, 0.3);
+		background: rgba(255, 255, 255, 0.04);
+		border-color: var(--line-strong);
+		color: var(--text-strong);
 	}
 
 	.hero__ticker strong,

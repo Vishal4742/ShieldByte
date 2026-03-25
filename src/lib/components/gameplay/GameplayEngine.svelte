@@ -21,7 +21,9 @@
 		streakDays?: number;
 	}
 
-	let { mission, streakDays = 0 }: Props = $props();
+let { mission, streakDays = 0 }: Props = $props();
+
+const PREDICTION_SESSION_KEY_PREFIX = 'shieldbyte:prediction';
 
 	const segments = $derived(buildMissionSegments(mission.messageBody, mission.clues));
 	const matchedClueIds = $derived(
@@ -86,33 +88,25 @@
 	let tickTimer: number | undefined;
 	let livesTimer: number | undefined;
 	let flashTimer: number | undefined;
-	let swipeOffsetX = $state(0);
-	let swipeDragging = $state(false);
-	let swipePointerId = $state<number | null>(null);
-	let swipeStartX = $state(0);
-	let comboChain = $state(0);
-	let bestCombo = $state(0);
-	let verdictChoice = $state<'scam' | 'safe' | null>(null);
-	let verdictCorrect = $state<boolean | null>(null);
-	let verdictProcessing = $state(false);
-	const missionLabel = $derived(mission.fraudType.replaceAll('_', ' '));
-	const beginnerSteps = [
-		'Read the message and decide: scam or safe.',
-		'Then tap the risky words or phrases.',
-		'Each wrong move costs a shield before the timer runs out.'
-	];
+
+let comboChain = $state(0);
+let bestCombo = $state(0);
+let verdictChoice = $state<'scam' | 'safe' | null>(null);
+let verdictCorrect = $state<boolean | null>(null);
+let verdictProcessing = $state(false);
+const missionLabel = $derived(mission.fraudType.replaceAll('_', ' '));
+const beginnerSteps = [
+	'Read the case and predict scam or safe.',
+	'Then tap the risky words or phrases.',
+	'Each wrong move costs a shield before the timer runs out.'
+];
 
 	const allCluesFound = $derived(foundIds.length === mission.clues.length);
 	const timerTone = $derived(secondsRemaining <= LOW_TIME_THRESHOLD_SECONDS ? 'critical' : 'steady');
 	const hasLives = $derived(livesState.lives > 0);
 	const completionPercent = $derived(Math.round((foundIds.length / mission.clues.length) * 100));
 	const shieldDisplay = $derived(Array.from({ length: 3 }, (_, index) => index < livesState.lives));
-	const swipeDecision = $derived.by(() => {
-		if (swipeOffsetX > 70) return 'start';
-		if (swipeOffsetX < -70) return 'skip';
-		return null;
-	});
-	const swipeRotation = $derived(Math.max(-14, Math.min(14, swipeOffsetX / 18)));
+
 	const comboLabel = $derived(comboChain >= 3 ? 'Hot streak' : comboChain > 0 ? 'Building' : 'Cold start');
 	const threatPercent = $derived.by(() => {
 		if (result) {
@@ -192,8 +186,8 @@
 		}
 	}
 
-	function beginMission() {
-		if (missionState === 'active' || missionState === 'judging' || result || livesState.lives <= 0) {
+function beginMission() {
+	if (missionState === 'active' || missionState === 'judging' || result || livesState.lives <= 0) {
 			return;
 		}
 
@@ -201,33 +195,55 @@
 		paused = false;
 		verdictChoice = null;
 		verdictCorrect = null;
-		feedbackTitle = 'Make your call';
-		feedbackBody = 'First decide whether this message is a scam or safe. Then the clue hunt begins.';
-		swipeOffsetX = 0;
-		swipeDragging = false;
+	feedbackTitle = 'Make your call';
+	feedbackBody = 'First decide whether this message is a scam or safe. Then the clue hunt begins.';
+}
+
+function predictionSessionKey() {
+	if (!playerId) {
+		return null;
 	}
 
-	async function resolveVerdict(choice: 'scam' | 'safe') {
-		if (missionState !== 'judging' || result || verdictChoice !== null || verdictProcessing) {
-			return;
+	return `${PREDICTION_SESSION_KEY_PREFIX}:${playerId}:${mission.id}`;
+}
+
+async function resolveVerdict(choice: 'scam' | 'safe') {
+	if ((missionState !== 'ready' && missionState !== 'judging') || result || verdictChoice !== null || verdictProcessing) {
+		return;
+	}
+
+	verdictProcessing = true;
+	verdictChoice = choice;
+	const isCorrect = choice === 'scam';
+	verdictCorrect = isCorrect;
+
+	if (browser) {
+		const storageKey = predictionSessionKey();
+		if (storageKey) {
+			sessionStorage.setItem(
+				storageKey,
+				JSON.stringify({
+					missionId: mission.id,
+					playerId,
+					prediction: choice,
+					correct: isCorrect,
+					recordedAt: new Date().toISOString()
+				})
+			);
 		}
+	}
 
-		verdictProcessing = true;
-		verdictChoice = choice;
-		const isCorrect = choice === 'scam';
-		verdictCorrect = isCorrect;
-
-		if (isCorrect) {
-			feedbackTitle = 'Correct judgment';
-			feedbackBody = 'This is a scam. Now lock the exact warning signs before the clock runs out.';
-		} else {
-			const nextLives = consumeLife(livesState, Date.now());
-			livesState = nextLives; // Optimistic update before server call
-			wrongTaps += 1;
-			comboChain = 0;
-			feedbackTitle = 'Wrong judgment';
-			feedbackBody = 'This case is a scam. You lost one shield, but you can still recover by finding the clues.';
-			await persistLives(nextLives);
+	if (isCorrect) {
+		feedbackTitle = 'Prediction recorded';
+		feedbackBody = 'You marked this case as a scam. Now lock the exact warning signs before the clock runs out.';
+	} else {
+		const nextLives = consumeLife(livesState, Date.now());
+		livesState = nextLives; // Optimistic update before server call
+		wrongTaps += 1;
+		comboChain = 0;
+		feedbackTitle = 'Prediction recorded';
+		feedbackBody = 'You marked this case as safe, but it is a scam. You lost one shield, but you can still recover by finding the clues.';
+		await persistLives(nextLives);
 
 			if (livesState.lives <= 0) {
 				verdictProcessing = false;
@@ -236,74 +252,10 @@
 			}
 		}
 
-		verdictProcessing = false;
-		missionState = 'active';
-		startTimers();
-	}
-
-	function handleBriefingPointerDown(event: PointerEvent) {
-		if (missionState !== 'ready' || result) {
-			return;
-		}
-
-		swipeDragging = true;
-		swipePointerId = event.pointerId;
-		swipeStartX = event.clientX - swipeOffsetX;
-		(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
-	}
-
-	function handleBriefingPointerMove(event: PointerEvent) {
-		if (!swipeDragging || swipePointerId !== event.pointerId) {
-			return;
-		}
-
-		swipeOffsetX = Math.max(-180, Math.min(180, event.clientX - swipeStartX));
-	}
-
-	function resolveBriefingSwipe() {
-		if (swipeOffsetX > 120) {
-			beginMission();
-			return;
-		}
-
-		if (swipeOffsetX < -120) {
-			if (browser) {
-				window.location.assign('/play');
-			}
-			return;
-		}
-
-		swipeOffsetX = 0;
-	}
-
-	function handleBriefingPointerUp(event: PointerEvent) {
-		if (swipePointerId !== event.pointerId) {
-			return;
-		}
-
-		swipeDragging = false;
-		swipePointerId = null;
-		resolveBriefingSwipe();
-	}
-
-	function handleBriefingKeydown(event: KeyboardEvent) {
-		if (missionState !== 'ready' || result) {
-			return;
-		}
-
-		if (event.key === 'ArrowRight' || event.key === 'Enter' || event.key === ' ') {
-			event.preventDefault();
-			beginMission();
-		}
-
-		if (event.key === 'ArrowLeft') {
-			event.preventDefault();
-			if (browser) {
-				window.location.assign('/play');
-			}
-		}
-	}
-
+	verdictProcessing = false;
+	missionState = 'active';
+	startTimers();
+}
 	function startTimers() {
 		stopTimers();
 
@@ -596,9 +548,6 @@
 		feedbackError = false;
 		newBadges = [];
 		rankUp = null;
-		swipeOffsetX = 0;
-		swipeDragging = false;
-		swipePointerId = null;
 		flashState = 'idle';
 		feedbackTitle = livesState.lives > 0 ? 'Mission ready' : 'No shields available';
 		feedbackBody =
@@ -661,7 +610,7 @@
 			feedbackTitle = livesState.lives > 0 ? 'Mission briefing' : 'No shields available';
 			feedbackBody =
 				livesState.lives > 0
-					? 'Read the setup, decide scam or safe, then find the warning signs before time runs out.'
+					? 'Read the setup and predict whether this case is a scam or safe.'
 					: 'You are out of shields. Wait for one to recharge or come back later.';
 		})();
 
@@ -685,7 +634,7 @@
 		</div>
 
 		<div class="mission-strip__controls">
-			<a class="ghost-link" href="/play">New round</a>
+			<a class="ghost-link" href="/#queue">Mission board</a>
 			<button type="button" class="ghost-button" onclick={togglePause}>
 				{paused ? 'Resume round' : 'Pause round'}
 			</button>
@@ -780,23 +729,10 @@
 
 			{#if missionState === 'ready' && !result}
 				<div
-					class:briefing-card--dragging={swipeDragging}
 					class="briefing-card"
-					role="button"
-					tabindex="0"
-					aria-label="Swipe right to start mission or swipe left to skip mission"
-					style={`transform: translateX(${swipeOffsetX}px) rotate(${swipeRotation}deg);`}
-					onpointerdown={handleBriefingPointerDown}
-					onpointermove={handleBriefingPointerMove}
-					onpointerup={handleBriefingPointerUp}
-					onpointercancel={handleBriefingPointerUp}
-					onkeydown={handleBriefingKeydown}
+					role="region"
+					aria-label="Mission briefing"
 				>
-					<div class="briefing-card__swipe-hint">
-						<span class:active={swipeDecision === 'skip'}>Skip</span>
-						<strong>Swipe</strong>
-						<span class:active={swipeDecision === 'start'}>Deploy</span>
-					</div>
 					<div class="briefing-card__header">
 						<div>
 							<p class="label">Mission briefing</p>
@@ -824,26 +760,23 @@
 					</div>
 					<p class="briefing-card__tip">{mission.tip}</p>
 					<div class="briefing-card__actions">
-						<button type="button" class="ghost-button" onclick={() => browser && window.location.assign('/play')}>
-							Skip mission
-						</button>
-						<button type="button" class="primary-action briefing-card__action" onclick={beginMission}>
-							Start round
-						</button>
-					</div>
-				</div>
-			{/if}
-
-			{#if missionState === 'judging' && !result}
-				<div class="verdict-panel">
-					<p class="label">Step 1: Quick judgment</p>
-					<h3>{verdictProcessing ? 'Processing...' : 'Is this message a scam or safe?'}</h3>
-					<p>Make the first call before the clue timer starts. A wrong judgment costs one shield.</p>
-					<div class="verdict-panel__actions">
-						<button type="button" class="verdict verdict--danger" disabled={verdictProcessing || verdictChoice !== null} onclick={() => resolveVerdict('scam')}>
+						<a class="ghost-link" href="/#queue">
+							Back to mission board
+						</a>
+						<button
+							type="button"
+							class="verdict verdict--danger briefing-card__action"
+							disabled={verdictProcessing || livesState.lives <= 0}
+							onclick={() => resolveVerdict('scam')}
+						>
 							Scam
 						</button>
-						<button type="button" class="verdict" disabled={verdictProcessing || verdictChoice !== null} onclick={() => resolveVerdict('safe')}>
+						<button
+							type="button"
+							class="verdict briefing-card__action"
+							disabled={verdictProcessing || livesState.lives <= 0}
+							onclick={() => resolveVerdict('safe')}
+						>
 							Safe
 						</button>
 					</div>
@@ -1065,7 +998,7 @@
 
 			<div class="result-actions">
 				<button type="button" class="primary-action" onclick={restartMission}>Play again</button>
-				<a class="ghost-link" href="/play">New round</a>
+				<a class="ghost-link" href="/#queue">Mission board</a>
 			</div>
 		</section>
 	{/if}
@@ -1073,15 +1006,15 @@
 
 <style>
 	.gameplay-shell {
-		--panel: rgba(8, 15, 24, 0.88);
-		--panel-strong: rgba(11, 20, 32, 0.94);
-		--line: rgba(138, 190, 214, 0.18);
-		--line-hot: rgba(255, 111, 97, 0.44);
+		--panel: rgba(255, 255, 255, 0.03);
+		--panel-strong: rgba(255, 255, 255, 0.06);
+		--line: rgba(255, 255, 255, 0.16);
+		--line-hot: rgba(237, 161, 103, 0.4);
 		--text: #f2eee7;
 		--muted: rgba(236, 230, 219, 0.62);
-		--mint: #7df2c9;
-		--amber: #f5c46c;
-		--red: #ff6f61;
+		--mint: rgba(255, 255, 255, 0.9);
+		--amber: #eda167;
+		--red: #eda167;
 		display: grid;
 		gap: 1rem;
 		color: var(--text);
@@ -1375,39 +1308,6 @@
 		background:
 			radial-gradient(circle at top right, rgba(255, 183, 77, 0.08), transparent 22%),
 			rgba(255, 255, 255, 0.03);
-		touch-action: pan-y;
-		transition: transform 180ms ease;
-	}
-
-	.briefing-card--dragging {
-		transition: none;
-		cursor: grabbing;
-	}
-
-	.briefing-card__swipe-hint {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		gap: 0.75rem;
-		margin-bottom: 0.9rem;
-		font-family: var(--font-mono, 'IBM Plex Mono', monospace);
-		font-size: 0.66rem;
-		letter-spacing: 0.16em;
-		text-transform: uppercase;
-		color: var(--muted);
-	}
-
-	.briefing-card__swipe-hint span,
-	.briefing-card__swipe-hint strong {
-		padding: 0.35rem 0.55rem;
-		border: 1px solid rgba(255, 255, 255, 0.08);
-		background: rgba(255, 255, 255, 0.03);
-	}
-
-	.briefing-card__swipe-hint span.active {
-		border-color: rgba(255, 183, 77, 0.3);
-		background: rgba(255, 183, 77, 0.08);
-		color: var(--text);
 	}
 
 	.briefing-card__header,
@@ -1478,37 +1378,6 @@
 		margin-top: 1rem;
 	}
 
-	.verdict-panel {
-		margin-top: 1rem;
-		padding: 1rem;
-		border: 1px solid rgba(245, 196, 108, 0.22);
-		border-radius: 1rem;
-		background:
-			radial-gradient(circle at top right, rgba(245, 196, 108, 0.08), transparent 22%),
-			rgba(255, 255, 255, 0.03);
-	}
-
-	.verdict-panel h3 {
-		margin: 0.45rem 0 0;
-		font-family: var(--font-display);
-		font-size: clamp(1.9rem, 4vw, 2.6rem);
-		font-weight: 500;
-		line-height: 0.98;
-	}
-
-	.verdict-panel p:last-of-type {
-		margin: 0.75rem 0 0;
-		color: var(--muted);
-		line-height: 1.7;
-	}
-
-	.verdict-panel__actions {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 0.8rem;
-		margin-top: 1rem;
-	}
-
 	.verdict {
 		min-height: 3.2rem;
 		padding: 0 1rem;
@@ -1556,24 +1425,36 @@
 
 	.fallback-clues__grid {
 		display: grid;
-		grid-template-columns: repeat(2, minmax(0, 1fr));
+		grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
 		gap: 0.75rem;
 		margin-top: 1rem;
 	}
 
 	.fallback-clue {
+		appearance: none;
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		justify-content: flex-start;
+		width: 100%;
+		min-height: 8.5rem;
 		padding: 0.9rem;
 		border: 1px solid rgba(130, 191, 255, 0.12);
-		border-radius: 0.9rem;
+		border-radius: 1rem;
 		background: rgba(255, 255, 255, 0.03);
 		color: var(--text);
 		text-align: left;
 		cursor: pointer;
+		box-sizing: border-box;
+		white-space: normal;
+		word-break: break-word;
+		overflow-wrap: anywhere;
 	}
 
 	.fallback-clue span,
 	.fallback-clue strong {
 		display: block;
+		width: 100%;
 	}
 
 	.fallback-clue span {
@@ -1587,7 +1468,8 @@
 	.fallback-clue strong {
 		margin-top: 0.55rem;
 		font-size: 1rem;
-		line-height: 1.45;
+		line-height: 1.5;
+		font-family: var(--font-display, 'Cormorant Garamond', serif);
 	}
 
 	.fallback-clue.found {
@@ -2035,16 +1917,11 @@
 			padding: 0.9rem;
 		}
 
-		.briefing-card__swipe-hint,
 		.sync-metrics {
 			gap: 0.45rem;
 		}
 
 		.fallback-clues__grid {
-			grid-template-columns: 1fr;
-		}
-
-		.verdict-panel__actions {
 			grid-template-columns: 1fr;
 		}
 
@@ -2069,8 +1946,7 @@
 		}
 
 		.ai-feedback-card__header,
-		.result-clues article div,
-		.briefing-card__swipe-hint {
+		.result-clues article div {
 			flex-direction: column;
 			align-items: flex-start;
 		}

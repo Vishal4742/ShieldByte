@@ -20,11 +20,11 @@
 	};
 
 	const rankColors: Record<string, string> = {
-		Rookie: '#94a3b8',
-		'Alert Analyst': '#60a5fa',
-		'Threat Specialist': '#a78bfa',
-		'Cyber Commander': '#f59e0b',
-		'Shield Master': '#7df2c9'
+		Rookie: 'rgba(255, 255, 255, 0.42)',
+		'Alert Analyst': 'rgba(255, 255, 255, 0.56)',
+		'Threat Specialist': 'rgba(255, 255, 255, 0.72)',
+		'Cyber Commander': 'rgba(255, 255, 255, 0.86)',
+		'Shield Master': '#eda167'
 	};
 
 	$effect(() => {
@@ -231,11 +231,11 @@
 	.badge-tile,
 	.history-table,
 	.empty-state {
-		border: 1px solid rgba(130, 191, 255, 0.1);
+		border: 1px solid rgba(10, 10, 10, 0.1);
 		border-radius: 1.2rem;
 		background:
-			radial-gradient(circle at top right, rgba(66, 199, 255, 0.06), transparent 24%),
-			linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.015)),
+			radial-gradient(circle at top right, rgba(230, 57, 70, 0.06), transparent 24%),
+			linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.12)),
 			var(--surface-1);
 		box-shadow: var(--shadow-hud);
 	}
@@ -283,7 +283,7 @@
 
 	.profile-rank-card__fill {
 		height: 100%;
-		background: linear-gradient(90deg, var(--accent-cyan), var(--accent-mint));
+		background: linear-gradient(90deg, var(--accent-cyan), var(--accent-hot));
 	}
 
 	.profile-rank-card__meta {
@@ -341,10 +341,10 @@
 	}
 
 	.badge-tile--earned {
-		border-color: rgba(87, 255, 214, 0.16);
+		border-color: rgba(230, 57, 70, 0.16);
 		background:
-			radial-gradient(circle at left, rgba(87, 255, 214, 0.06), transparent 60%),
-			linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.015)),
+			radial-gradient(circle at left, rgba(230, 57, 70, 0.06), transparent 60%),
+			linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.12)),
 			var(--surface-1);
 	}
 
@@ -355,8 +355,8 @@
 		width: 3.15rem;
 		height: 3.15rem;
 		border-radius: 999px;
-		border: 1px solid rgba(130, 191, 255, 0.12);
-		background: rgba(255, 255, 255, 0.03);
+		border: 1px solid rgba(10, 10, 10, 0.1);
+		background: rgba(255, 255, 255, 0.18);
 		font-family: var(--font-mono);
 		font-size: 0.7rem;
 		letter-spacing: 0.08em;
@@ -394,7 +394,7 @@
 	}
 
 	.history-table__header {
-		border-bottom: 1px solid rgba(130, 191, 255, 0.08);
+		border-bottom: 1px solid rgba(10, 10, 10, 0.08);
 		font-family: var(--font-mono);
 		font-size: 0.64rem;
 		letter-spacing: 0.16em;
@@ -417,7 +417,7 @@
 	}
 
 	.history-row__xp {
-		color: var(--accent-mint);
+		color: var(--accent-hot);
 	}
 
 	.history-row__outcome {
@@ -432,7 +432,7 @@
 	}
 
 	.outcome--failed {
-		color: #ff6f61;
+		color: var(--accent-hot);
 	}
 
 	.outcome--timeout {
@@ -457,8 +457,8 @@
 		min-height: 3rem;
 		padding: 0 1.35rem;
 		border-radius: 999px;
-		background: linear-gradient(135deg, var(--accent-cyan), var(--accent-mint));
-		color: #07131f;
+		background: linear-gradient(135deg, var(--accent-cyan), var(--accent-hot));
+		color: #f4f4f2;
 		font-family: var(--font-mono);
 		font-size: 0.7rem;
 		font-weight: 600;
@@ -469,7 +469,7 @@
 
 	.cta-button--ghost {
 		background: transparent;
-		border: 1px solid rgba(130, 191, 255, 0.12);
+		border: 1px solid rgba(10, 10, 10, 0.12);
 		color: var(--text-strong);
 	}
 

@@ -59,26 +59,11 @@
 	}
 
 	.shell__grain {
-		position: fixed;
-		inset: 0;
-		pointer-events: none;
-		opacity: 0.15;
-		background-image:
-			linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
-			linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
-		background-size: 52px 52px;
+		display: none;
 	}
 
 	.shell__stars {
-		position: fixed;
-		inset: 0;
-		pointer-events: none;
-		background:
-			radial-gradient(circle at 16% 22%, rgba(255, 255, 255, 0.34) 0 1px, transparent 1px),
-			radial-gradient(circle at 68% 12%, rgba(255, 255, 255, 0.18) 0 1px, transparent 1px),
-			radial-gradient(circle at 84% 38%, rgba(255, 255, 255, 0.22) 0 1px, transparent 1px),
-			radial-gradient(circle at 34% 72%, rgba(255, 255, 255, 0.18) 0 1px, transparent 1px);
-		opacity: 0.4;
+		display: none;
 	}
 
 	.section-heading p,
@@ -103,10 +88,10 @@
 		border: 1px solid var(--panel-border);
 		border-radius: 1.35rem;
 		background:
-			radial-gradient(circle at top right, rgba(66, 199, 255, 0.09), transparent 24%),
-			linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01)),
+			radial-gradient(circle at top right, rgba(230, 57, 70, 0.08), transparent 24%),
+			linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02)),
 			var(--surface-1);
-		box-shadow: var(--shadow-hud);
+		box-shadow: 0 18px 42px rgba(0, 0, 0, 0.18);
 	}
 
 	.feed-panel {

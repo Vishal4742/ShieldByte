@@ -131,7 +131,7 @@ export async function evaluateBadges(event: BadgeEventData): Promise<EarnedBadge
 	}
 
 	// ── viral_protector + mentor: deferred to Phase 7 ──
-	// These badges will be checked when the referral system is built.
+	// Referral-based badges are currently inactive.
 
 	if (candidateIds.length === 0) {
 		return [];
@@ -155,55 +155,6 @@ export async function evaluateBadges(event: BadgeEventData): Promise<EarnedBadge
 	}
 
 	// 4. Return newly earned badges with metadata
-	return candidateIds.map((badgeId) => {
-		const def = BADGE_DEFINITIONS.find((b) => b.id === badgeId)!;
-		return {
-			badgeId: def.id,
-			name: def.name,
-			description: def.description,
-			category: def.category,
-			earnedAt: now
-		};
-	});
-}
-
-export async function evaluateReferralBadges(userId: string): Promise<EarnedBadge[]> {
-	const { data: existingBadges, error: badgesError } = await supabase
-		.from('user_badges')
-		.select('badge_id')
-		.eq('user_id', userId);
-
-	if (badgesError) {
-		console.error('[badge-engine] evaluateReferralBadges: failed to fetch existing badges:', badgesError.message);
-		return []; // Fail safe: don't re-award badges if we can't check existing ones
-	}
-
-	const earnedSet = new Set((existingBadges ?? []).map((b: { badge_id: string }) => b.badge_id));
-	const candidateIds: string[] = [];
-
-	if (!earnedSet.has('viral_protector')) {
-		const { data } = await supabase.from('referral_links').select('clicks').eq('user_id', userId);
-		const totalClicks = data?.reduce((acc: number, link: any) => acc + (link.clicks || 0), 0) || 0;
-		if (totalClicks >= 10) candidateIds.push('viral_protector');
-	}
-
-	if (!earnedSet.has('mentor')) {
-		const { data } = await supabase.from('referral_links').select('successful_recruits').eq('user_id', userId);
-		const totalRecruits = data?.reduce((acc: number, link: any) => acc + (link.successful_recruits || 0), 0) || 0;
-		if (totalRecruits >= 5) candidateIds.push('mentor');
-	}
-
-	if (candidateIds.length === 0) return [];
-
-	const now = new Date().toISOString();
-	const rows = candidateIds.map((badgeId) => ({
-		user_id: userId,
-		badge_id: badgeId,
-		earned_at: now
-	}));
-
-	await supabase.from('user_badges').upsert(rows, { onConflict: 'user_id,badge_id', ignoreDuplicates: true });
-
 	return candidateIds.map((badgeId) => {
 		const def = BADGE_DEFINITIONS.find((b) => b.id === badgeId)!;
 		return {

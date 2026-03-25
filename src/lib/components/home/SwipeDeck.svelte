@@ -237,9 +237,9 @@
 		border: 1px solid var(--panel-border);
 		border-radius: 1.35rem;
 		background:
-			radial-gradient(circle at top right, rgba(66, 199, 255, 0.08), transparent 22%),
-			radial-gradient(circle at bottom left, rgba(87, 255, 214, 0.05), transparent 18%),
-			linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01)),
+			radial-gradient(circle at top right, rgba(255, 255, 255, 0.06), transparent 22%),
+			radial-gradient(circle at bottom left, rgba(237, 161, 103, 0.08), transparent 18%),
+			linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.015)),
 			var(--surface-1);
 		box-shadow: var(--shadow-hud);
 		overflow: hidden;
@@ -301,9 +301,9 @@
 	.mission-queue__scoreboard article {
 		min-width: 0;
 		padding: 0.7rem 0.8rem 0.8rem;
-		border: 1px solid rgba(130, 191, 255, 0.1);
+		border: 1px solid rgba(10, 10, 10, 0.08);
 		border-radius: 0.95rem;
-		background: rgba(255, 255, 255, 0.025);
+		background: rgba(255, 255, 255, 0.05);
 	}
 
 	.mission-queue__scoreboard strong {
@@ -317,7 +317,7 @@
 	.mission-queue__toolbar {
 		margin-top: 1.2rem;
 		padding-top: 1rem;
-		border-top: 1px solid rgba(130, 191, 255, 0.08);
+		border-top: 1px solid rgba(10, 10, 10, 0.08);
 	}
 
 	.mission-queue__position strong {
@@ -336,9 +336,9 @@
 	.mission-queue__control {
 		min-height: 2.8rem;
 		padding: 0 1rem;
-		border: 1px solid rgba(130, 191, 255, 0.12);
+		border: 1px solid rgba(10, 10, 10, 0.1);
 		border-radius: 0.9rem;
-		background: rgba(255, 255, 255, 0.03);
+		background: rgba(255, 255, 255, 0.05);
 		color: var(--text-strong);
 		font-family: var(--font-mono);
 		font-size: 0.68rem;
@@ -353,8 +353,9 @@
 	}
 
 	.mission-queue__control--primary {
-		background: linear-gradient(135deg, var(--accent-cyan), var(--accent-mint));
-		color: #091018;
+		background: rgba(255, 255, 255, 0.04);
+		color: var(--text-strong);
+		border-color: var(--line-strong);
 		border-color: transparent;
 	}
 
@@ -380,10 +381,11 @@
 		align-content: start;
 		min-height: 24.5rem;
 		padding: 1.15rem;
-		border: 1px solid rgba(130, 191, 255, 0.12);
+		border: 1px solid rgba(10, 10, 10, 0.08);
 		border-radius: 1.15rem;
 		background:
-			linear-gradient(145deg, rgba(66, 199, 255, 0.04), rgba(255, 255, 255, 0.01)),
+			linear-gradient(145deg, rgba(255, 255, 255, 0.04), rgba(237, 161, 103, 0.06)),
+			linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01)),
 			var(--surface-2);
 		box-shadow: var(--shadow-hud);
 		scroll-snap-align: start;
@@ -439,9 +441,9 @@
 
 	.mission-card__flags span {
 		padding: 0.4rem 0.68rem;
-		border: 1px solid rgba(130, 191, 255, 0.12);
+		border: 1px solid rgba(10, 10, 10, 0.08);
 		border-radius: 999px;
-		background: rgba(66, 199, 255, 0.08);
+		background: rgba(255, 255, 255, 0.05);
 		color: var(--text-strong);
 		font-size: 0.74rem;
 	}
@@ -457,18 +459,19 @@
 		font-size: 0.72rem;
 		letter-spacing: 0.16em;
 		text-transform: uppercase;
-		border: 1px solid rgba(130, 191, 255, 0.12);
+		border: 1px solid rgba(10, 10, 10, 0.08);
 		border-radius: 0.9rem;
 	}
 
 	.mission-card__actions a:first-child {
 		border-color: transparent;
-		background: linear-gradient(135deg, var(--accent-cyan), var(--accent-mint));
-		color: #091018;
+		background: rgba(255, 255, 255, 0.04);
+		color: var(--text-strong);
+		border-color: var(--line-strong);
 	}
 
 	.mission-card__secondary {
-		background: rgba(255, 255, 255, 0.03);
+		background: rgba(255, 255, 255, 0.05);
 		color: var(--text-strong);
 	}
 
@@ -487,7 +490,7 @@
 	}
 
 	.mission-queue__grid::-webkit-scrollbar-thumb {
-		background: rgba(130, 191, 255, 0.24);
+		background: rgba(10, 10, 10, 0.2);
 		border-radius: 999px;
 	}
 

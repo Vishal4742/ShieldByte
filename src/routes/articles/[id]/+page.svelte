@@ -187,11 +187,11 @@
 	.dossier-panel,
 	.clue-card,
 	.field-card {
-		border: 1px solid rgba(130, 191, 255, 0.1);
+		border: 1px solid rgba(10, 10, 10, 0.1);
 		border-radius: 1.2rem;
 		background:
-			radial-gradient(circle at top right, rgba(66, 199, 255, 0.06), transparent 24%),
-			linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.015)),
+			radial-gradient(circle at top right, rgba(230, 57, 70, 0.06), transparent 24%),
+			linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.12)),
 			var(--surface-1);
 		box-shadow: var(--shadow-hud);
 	}
@@ -248,8 +248,8 @@
 		min-height: 3rem;
 		padding: 0 1.2rem;
 		border-radius: 999px;
-		background: linear-gradient(135deg, var(--accent-cyan), var(--accent-mint));
-		color: #07131f;
+		background: linear-gradient(135deg, var(--accent-cyan), var(--accent-hot));
+		color: #f4f4f2;
 		font-family: var(--font-mono);
 		font-size: 0.7rem;
 		font-weight: 600;
@@ -260,7 +260,7 @@
 
 	.dossier-cta--ghost {
 		background: transparent;
-		border: 1px solid rgba(130, 191, 255, 0.12);
+		border: 1px solid rgba(10, 10, 10, 0.12);
 		color: var(--text-strong);
 	}
 
@@ -272,7 +272,7 @@
 
 	.dossier-hero__meta article {
 		padding: 0.85rem;
-		border: 1px solid rgba(130, 191, 255, 0.08);
+		border: 1px solid rgba(10, 10, 10, 0.08);
 		border-radius: 1rem;
 		background: rgba(255, 255, 255, 0.025);
 	}
@@ -350,9 +350,9 @@
 	.chips li,
 	.field-card li {
 		padding: 0.38rem 0.7rem;
-		border: 1px solid rgba(130, 191, 255, 0.1);
+		border: 1px solid rgba(10, 10, 10, 0.08);
 		border-radius: 999px;
-		background: rgba(255, 255, 255, 0.03);
+		background: rgba(255, 255, 255, 0.2);
 	}
 
 	.body-copy {

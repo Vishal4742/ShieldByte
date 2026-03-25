@@ -89,8 +89,8 @@
 		border: 1px solid var(--panel-border);
 		border-radius: 1.2rem;
 		background:
-			linear-gradient(140deg, rgba(66, 199, 255, 0.08), transparent 35%),
-			radial-gradient(circle at bottom right, rgba(87, 255, 214, 0.07), transparent 22%),
+			linear-gradient(140deg, rgba(255, 255, 255, 0.05), transparent 35%),
+			radial-gradient(circle at bottom right, rgba(237, 161, 103, 0.06), transparent 22%),
 			linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01)),
 			var(--surface-1);
 		min-height: 100%;
@@ -104,7 +104,7 @@
 	.threat-card:hover,
 	.threat-card:focus-within {
 		transform: translateY(-2px);
-		border-color: rgba(87, 255, 214, 0.34);
+		border-color: var(--line-strong);
 		box-shadow: 0 18px 40px rgba(0, 0, 0, 0.22);
 	}
 
@@ -186,8 +186,8 @@
 
 	.threat-card__tags li {
 		padding: 0.45rem 0.75rem;
-		background: rgba(66, 199, 255, 0.08);
-		border: 1px solid rgba(130, 191, 255, 0.1);
+		background: rgba(255, 255, 255, 0.05);
+		border: 1px solid rgba(255, 255, 255, 0.12);
 		border-radius: 999px;
 		color: var(--text-strong);
 		font-size: 0.82rem;

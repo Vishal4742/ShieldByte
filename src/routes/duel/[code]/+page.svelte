@@ -111,9 +111,9 @@
 	}
 
 	function winnerColor(winner: string): string {
-		if (winner === 'opponent') return '#7df2c9';
-		if (winner === 'challenger') return '#ff6f61';
-		return '#f5c46c';
+		if (winner === 'opponent') return '#0a0a0a';
+		if (winner === 'challenger') return '#e63946';
+		return '#b88d45';
 	}
 </script>
 
@@ -241,11 +241,11 @@
 	.duel-card,
 	.submit-card,
 	.duel-results {
-		border: 1px solid rgba(130, 191, 255, 0.1);
+		border: 1px solid rgba(10, 10, 10, 0.1);
 		border-radius: 1.2rem;
 		background:
-			radial-gradient(circle at top right, rgba(66, 199, 255, 0.06), transparent 24%),
-			linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.015)),
+			radial-gradient(circle at top right, rgba(230, 57, 70, 0.06), transparent 24%),
+			linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.12)),
 			var(--surface-1);
 		box-shadow: var(--shadow-hud);
 	}
@@ -286,7 +286,7 @@
 	}
 
 	.duel-card--accent {
-		border-color: rgba(87, 255, 214, 0.18);
+		border-color: rgba(230, 57, 70, 0.18);
 	}
 
 	.duel-stats {
@@ -298,7 +298,7 @@
 
 	.duel-stats div {
 		padding: 0.8rem;
-		border: 1px solid rgba(130, 191, 255, 0.08);
+		border: 1px solid rgba(10, 10, 10, 0.08);
 		border-radius: 1rem;
 		background: rgba(255, 255, 255, 0.025);
 	}
@@ -329,9 +329,9 @@
 
 	.duel-meta span {
 		padding: 0.4rem 0.65rem;
-		border: 1px solid rgba(130, 191, 255, 0.1);
+		border: 1px solid rgba(10, 10, 10, 0.1);
 		border-radius: 999px;
-		background: rgba(255, 255, 255, 0.03);
+		background: rgba(255, 255, 255, 0.2);
 	}
 
 	.duel-cta {
@@ -341,8 +341,8 @@
 		min-height: 3rem;
 		padding: 0 1.25rem;
 		border-radius: 999px;
-		background: linear-gradient(135deg, var(--accent-cyan), var(--accent-mint));
-		color: #07131f;
+		background: linear-gradient(135deg, var(--accent-cyan), var(--accent-hot));
+		color: #f4f4f2;
 		font-family: var(--font-mono);
 		font-size: 0.7rem;
 		font-weight: 600;
@@ -355,7 +355,7 @@
 
 	.duel-cta--ghost {
 		background: transparent;
-		border: 1px solid rgba(130, 191, 255, 0.12);
+		border: 1px solid rgba(10, 10, 10, 0.12);
 		color: var(--text-strong);
 	}
 
@@ -367,7 +367,7 @@
 		align-items: center;
 		justify-content: center;
 		padding: 1rem;
-		background: rgba(4, 6, 11, 0.84);
+		background: rgba(244, 244, 242, 0.74);
 		backdrop-filter: blur(10px);
 	}
 
@@ -384,11 +384,11 @@
 	}
 
 	.submit-card strong {
-		color: var(--accent-mint);
+		color: var(--accent-hot);
 	}
 
 	.submit-error {
-		color: #ff6f61 !important;
+		color: var(--accent-hot) !important;
 		font-family: var(--font-mono);
 		font-size: 0.72rem;
 		letter-spacing: 0.1em;

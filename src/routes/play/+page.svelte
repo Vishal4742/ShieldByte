@@ -65,8 +65,8 @@
 		pointer-events: none;
 		opacity: 0.08;
 		background-image:
-			linear-gradient(rgba(114, 255, 214, 0.12) 1px, transparent 1px),
-			linear-gradient(90deg, rgba(114, 255, 214, 0.08) 1px, transparent 1px);
+			linear-gradient(rgba(10, 10, 10, 0.12) 1px, transparent 1px),
+			linear-gradient(90deg, rgba(230, 57, 70, 0.08) 1px, transparent 1px);
 		background-size: 88px 88px;
 	}
 
@@ -83,13 +83,13 @@
 	.play-shell__glow--mint {
 		top: -12rem;
 		left: -10rem;
-		background: #7df2c9;
+		background: #e63946;
 	}
 
 	.play-shell__glow--ember {
 		right: -12rem;
 		top: 2rem;
-		background: #ff6f61;
+		background: #0a0a0a;
 	}
 
 	.play-head {
@@ -102,8 +102,8 @@
 		align-items: end;
 		padding: 1rem clamp(1.2rem, 4vw, 3rem) 0.9rem;
 		backdrop-filter: blur(18px);
-		background: linear-gradient(180deg, rgba(7, 14, 24, 0.9), rgba(7, 14, 24, 0.58));
-		border-bottom: 1px solid rgba(130, 191, 255, 0.08);
+		background: linear-gradient(180deg, rgba(248, 248, 245, 0.9), rgba(244, 244, 242, 0.58));
+		border-bottom: 1px solid rgba(10, 10, 10, 0.08);
 	}
 
 	.play-head p,
@@ -113,7 +113,7 @@
 		font-size: 0.72rem;
 		letter-spacing: 0.16em;
 		text-transform: uppercase;
-		color: rgba(242, 238, 231, 0.62);
+		color: var(--text-muted);
 	}
 
 	.play-head h1 {
@@ -132,9 +132,9 @@
 
 	.play-head__meta span {
 		padding: 0.5rem 0.7rem;
-		border: 1px solid rgba(130, 191, 255, 0.1);
+		border: 1px solid rgba(10, 10, 10, 0.1);
 		border-radius: 999px;
-		background: rgba(255, 255, 255, 0.025);
+		background: rgba(255, 255, 255, 0.24);
 		color: var(--text-soft);
 	}
 
@@ -147,11 +147,11 @@
 	.empty-state {
 		max-width: 44rem;
 		padding: 1.4rem;
-		border: 1px solid rgba(130, 191, 255, 0.12);
+		border: 1px solid rgba(10, 10, 10, 0.1);
 		border-radius: 1.25rem;
 		background:
-			radial-gradient(circle at top right, rgba(66, 199, 255, 0.08), transparent 26%),
-			linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01)),
+			radial-gradient(circle at top right, rgba(230, 57, 70, 0.08), transparent 26%),
+			linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.12)),
 			var(--surface-2);
 		box-shadow: var(--shadow-hud);
 	}
@@ -173,7 +173,7 @@
 		display: inline-flex;
 		margin-top: 1rem;
 		padding: 0.85rem 1rem;
-		border: 1px solid rgba(130, 191, 255, 0.12);
+		border: 1px solid rgba(10, 10, 10, 0.12);
 		border-radius: 999px;
 		color: var(--text-strong);
 		text-decoration: none;

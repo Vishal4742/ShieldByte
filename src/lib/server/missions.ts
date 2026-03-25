@@ -16,6 +16,11 @@ interface MissionRow {
 	clues_json: unknown;
 }
 
+const MISSION_SELECT =
+	'id, article_id, fraud_type, expected_verdict, simulation_type, sender, message_body, difficulty, tip, variant, clues_json';
+const LEGACY_MISSION_SELECT =
+	'id, article_id, fraud_type, simulation_type, sender, message_body, difficulty, tip, variant, clues_json';
+
 const DEVANAGARI_REGEX = /[\u0900-\u097F]/;
 
 function asString(value: unknown, fallback = ''): string {
@@ -86,17 +91,48 @@ function normalizeMission(row: MissionRow): ThreatMission {
 	};
 }
 
+function isMissingExpectedVerdictColumn(error: { message?: string } | null): boolean {
+	return Boolean(error?.message?.includes('column missions.expected_verdict does not exist'));
+}
+
+function withDefaultExpectedVerdict(row: unknown): MissionRow {
+	const mission = row as Partial<MissionRow>;
+
+	return {
+		id: typeof mission.id === 'number' ? mission.id : 0,
+		article_id: typeof mission.article_id === 'number' ? mission.article_id : null,
+		fraud_type: mission.fraud_type ?? null,
+		expected_verdict: mission.expected_verdict ?? 'scam',
+		simulation_type: mission.simulation_type ?? null,
+		sender: mission.sender ?? null,
+		message_body: mission.message_body ?? null,
+		difficulty: mission.difficulty ?? null,
+		tip: mission.tip ?? null,
+		variant: typeof mission.variant === 'number' ? mission.variant : null,
+		clues_json: mission.clues_json ?? null
+	};
+}
+
 export async function fetchMissionForArticle(articleId: number): Promise<ThreatMission | null> {
-	const { data, error } = await supabase
+	let { data, error } = await supabase
 		.from('missions')
-		.select(
-			'id, article_id, fraud_type, expected_verdict, simulation_type, sender, message_body, difficulty, tip, variant, clues_json'
-		)
+		.select(MISSION_SELECT)
 		.eq('article_id', articleId)
 		.eq('status', 'active')
 		.order('variant', { ascending: true })
 		.limit(1)
 		.maybeSingle();
+
+	if (isMissingExpectedVerdictColumn(error)) {
+		({ data, error } = await supabase
+			.from('missions')
+			.select(LEGACY_MISSION_SELECT)
+			.eq('article_id', articleId)
+			.eq('status', 'active')
+			.order('variant', { ascending: true })
+			.limit(1)
+			.maybeSingle());
+	}
 
 	if (error) {
 		console.error('[missions] Failed to fetch mission for article:', error.message);
@@ -107,7 +143,7 @@ export async function fetchMissionForArticle(articleId: number): Promise<ThreatM
 		return null;
 	}
 
-	return normalizeMission(data as MissionRow);
+	return normalizeMission(withDefaultExpectedVerdict(data));
 }
 
 export async function fetchRandomActiveMission(filters?: {
@@ -117,9 +153,7 @@ export async function fetchRandomActiveMission(filters?: {
 	const { difficulty, fraudType } = filters ?? {};
 	let query = supabase
 		.from('missions')
-		.select(
-			'id, article_id, fraud_type, expected_verdict, simulation_type, sender, message_body, difficulty, tip, variant, clues_json'
-		)
+		.select(MISSION_SELECT)
 		.eq('status', 'active');
 
 	if (difficulty) {
@@ -130,7 +164,23 @@ export async function fetchRandomActiveMission(filters?: {
 		query = query.eq('fraud_type', fraudType);
 	}
 
-	const { data, error } = await query;
+	let { data, error } = await query;
+
+	if (isMissingExpectedVerdictColumn(error)) {
+		let legacyQuery = supabase.from('missions').select(LEGACY_MISSION_SELECT).eq('status', 'active');
+
+		if (difficulty) {
+			legacyQuery = legacyQuery.eq('difficulty', difficulty);
+		}
+
+		if (fraudType) {
+			legacyQuery = legacyQuery.eq('fraud_type', fraudType);
+		}
+
+		const legacyResult = await legacyQuery;
+		data = legacyResult.data as typeof data;
+		error = legacyResult.error;
+	}
 
 	if (error) {
 		console.error('[missions] Failed to fetch random mission pool:', error.message);
@@ -142,22 +192,30 @@ export async function fetchRandomActiveMission(filters?: {
 	}
 
 	const randomIndex = Math.floor(Math.random() * data.length);
-	return normalizeMission(data[randomIndex] as MissionRow);
+	return normalizeMission(withDefaultExpectedVerdict(data[randomIndex]));
 }
 
 export async function fetchMissionById(id: number): Promise<ThreatMission | null> {
-	const { data, error } = await supabase
+	let { data, error } = await supabase
 		.from('missions')
-		.select('id, article_id, fraud_type, expected_verdict, simulation_type, sender, message_body, difficulty, tip, variant, clues_json')
+		.select(MISSION_SELECT)
 		.eq('id', id)
 		.maybeSingle();
+
+	if (isMissingExpectedVerdictColumn(error)) {
+		({ data, error } = await supabase
+			.from('missions')
+			.select(LEGACY_MISSION_SELECT)
+			.eq('id', id)
+			.maybeSingle());
+	}
 
 	if (error || !data) {
 		console.error('[missions] Failed to fetch mission by ID:', error?.message);
 		return null;
 	}
 
-	return normalizeMission(data as MissionRow);
+	return normalizeMission(withDefaultExpectedVerdict(data));
 }
 
 function buildFallbackMessageBody(article: ThreatArticle): string {

@@ -25,7 +25,7 @@ let { mission, streakDays = 0 }: Props = $props();
 
 const PREDICTION_SESSION_KEY_PREFIX = 'shieldbyte:prediction';
 
-	const segments = $derived(buildMissionSegments(mission.messageBody, mission.clues));
+const segments = $derived(buildMissionSegments(mission.messageBody, mission.clues));
 	const matchedClueIds = $derived(
 		new Set(
 			segments
@@ -38,6 +38,7 @@ const PREDICTION_SESSION_KEY_PREFIX = 'shieldbyte:prediction';
 	);
 
 	let foundIds = $state<number[]>([]);
+	const foundIdSet = $derived(new Set(foundIds));
 	let wrongTaps = $state(0);
 	let secondsRemaining = $state(MISSION_DURATION_SECONDS);
 	let paused = $state(false);
@@ -120,6 +121,7 @@ const verdictStatusDetail = $derived.by(() => {
 	const timerTone = $derived(secondsRemaining <= LOW_TIME_THRESHOLD_SECONDS ? 'critical' : 'steady');
 	const hasLives = $derived(livesState.lives > 0);
 	const completionPercent = $derived(Math.round((foundIds.length / mission.clues.length) * 100));
+	const activeComboMultiplier = $derived(Math.max(comboChain, 1));
 	const shieldDisplay = $derived(Array.from({ length: 3 }, (_, index) => index < livesState.lives));
 
 	const comboLabel = $derived(comboChain >= 3 ? 'Hot streak' : comboChain > 0 ? 'Building' : 'Cold start');
@@ -158,7 +160,7 @@ const verdictStatusDetail = $derived.by(() => {
 		return 'Breach';
 	});
 	const nextHint = $derived(
-		mission.clues.find((clue) => !foundIds.includes(clue.id))?.explanation ??
+		mission.clues.find((clue) => !foundIdSet.has(clue.id))?.explanation ??
 			'No clues remain. Finish the run.'
 	);
 	const lifeCountdownLabel = $derived.by(() => {
@@ -483,7 +485,7 @@ async function resolveVerdict(choice: 'scam' | 'safe') {
 		}
 
 		if (segment.clueId !== null && segment.clue) {
-			if (foundIds.includes(segment.clueId)) {
+			if (foundIdSet.has(segment.clueId)) {
 				return;
 			}
 
@@ -517,7 +519,7 @@ async function resolveVerdict(choice: 'scam' | 'safe') {
 	}
 
 	function handleFallbackClueTap(clueId: number, explanation: string) {
-		if (missionState !== 'active' || paused || result || foundIds.includes(clueId)) {
+		if (missionState !== 'active' || paused || result || foundIdSet.has(clueId)) {
 			return;
 		}
 
@@ -703,11 +705,11 @@ async function resolveVerdict(choice: 'scam' | 'safe') {
 			<strong>{Math.min(1 + streakDays * 0.1, 2).toFixed(1)}x</strong>
 			<p>{streakDays} day streak applied</p>
 		</article>
-		<article>
-			<span class="label">Combo chain</span>
-			<strong>x{Math.max(comboChain, 1)}</strong>
-			<p>{comboLabel}</p>
-		</article>
+			<article>
+				<span class="label">Combo chain</span>
+				<strong>x{activeComboMultiplier}</strong>
+				<p>{comboLabel}</p>
+			</article>
 		<article class:critical={threatStatus === 'critical'}>
 			<span class="label">Threat meter</span>
 			<strong>{threatPercent}%</strong>
@@ -808,9 +810,9 @@ async function resolveVerdict(choice: 'scam' | 'safe') {
 						<button
 							type="button"
 							class:decoy={segment.clueId === null}
-							class:found={segment.clueId !== null && foundIds.includes(segment.clueId)}
+							class:found={segment.clueId !== null && foundIdSet.has(segment.clueId)}
 							class="message-token"
-							disabled={missionState !== 'active' || paused || (segment.clueId !== null && foundIds.includes(segment.clueId))}
+							disabled={missionState !== 'active' || paused || (segment.clueId !== null && foundIdSet.has(segment.clueId))}
 							onclick={() => handleSegmentTap(segment)}
 						>
 							{segment.text}
@@ -830,9 +832,9 @@ async function resolveVerdict(choice: 'scam' | 'safe') {
 						{#each fallbackClues as clue}
 							<button
 								type="button"
-								class:found={foundIds.includes(clue.id)}
+								class:found={foundIdSet.has(clue.id)}
 								class="fallback-clue"
-								disabled={missionState !== 'active' || paused || foundIds.includes(clue.id)}
+								disabled={missionState !== 'active' || paused || foundIdSet.has(clue.id)}
 								onclick={() => handleFallbackClueTap(clue.id, clue.explanation)}
 							>
 								<span>{clue.type.replaceAll('_', ' ')}</span>
@@ -859,35 +861,6 @@ async function resolveVerdict(choice: 'scam' | 'safe') {
 				<p class="label">Coach tip</p>
 				<h3>Best habit for this round</h3>
 				<p>{mission.tip}</p>
-			</section>
-
-			<section>
-				<p class="label">Target list</p>
-				<h3>Hidden red flags</h3>
-				<div class="clue-board">
-					{#each mission.clues as clue}
-						<article class:locked={foundIds.includes(clue.id)}>
-							<div>
-								<strong>{foundIds.includes(clue.id) ? 'Found' : 'Hidden'}</strong>
-								<span>{clue.difficulty}</span>
-							</div>
-							<p>{foundIds.includes(clue.id) ? clue.triggerText : 'Find this red flag somewhere in the message.'}</p>
-						</article>
-					{/each}
-				</div>
-			</section>
-
-			<section>
-				<p class="label">Run sync</p>
-				<h3>{saveState === 'saved' ? 'Round saved' : saveState === 'saving' ? 'Saving progress' : 'Progress tracker'}</h3>
-				<p>{saveMessage}</p>
-				{#if profileSnapshot}
-					<div class="sync-metrics">
-						<span>{profileSnapshot.rank}</span>
-						<span>{profileSnapshot.totalXp} XP</span>
-						<span>{profileSnapshot.streakDays} day streak</span>
-					</div>
-				{/if}
 			</section>
 		</aside>
 	</div>
@@ -1039,7 +1012,6 @@ async function resolveVerdict(choice: 'scam' | 'safe') {
 
 	.label,
 	.message-meta span,
-	.clue-board strong,
 	.result-clues span {
 		font-family: var(--font-mono, 'IBM Plex Mono', monospace);
 		font-size: 0.72rem;
@@ -1444,22 +1416,69 @@ async function resolveVerdict(choice: 'scam' | 'safe') {
 	}
 
 	.verdict {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
 		min-height: 3.2rem;
-		padding: 0 1rem;
-		border: 1px solid rgba(130, 191, 255, 0.14);
+		min-width: 6.5rem;
+		padding: 0 1.4rem;
+		border: 1.5px solid rgba(46, 196, 140, 0.45);
 		border-radius: 0.95rem;
-		background: rgba(255, 255, 255, 0.03);
+		background: linear-gradient(135deg, rgba(46, 196, 140, 0.22), rgba(125, 242, 201, 0.18));
 		color: var(--text);
 		font-family: var(--font-mono, 'IBM Plex Mono', monospace);
-		font-size: 0.72rem;
+		font-size: 0.78rem;
+		font-weight: 600;
 		letter-spacing: 0.16em;
 		text-transform: uppercase;
 		cursor: pointer;
+		transition:
+			transform 150ms ease,
+			border-color 150ms ease,
+			background-color 150ms ease,
+			box-shadow 150ms ease,
+			opacity 150ms ease;
+		box-shadow: 0 4px 14px rgba(46, 196, 140, 0.12);
+	}
+
+	.verdict:hover {
+		transform: translateY(-2px);
+		background: linear-gradient(135deg, rgba(46, 196, 140, 0.32), rgba(125, 242, 201, 0.26));
+		border-color: rgba(46, 196, 140, 0.6);
+		box-shadow: 0 8px 22px rgba(46, 196, 140, 0.18);
+	}
+
+	.verdict:active {
+		transform: translateY(0);
+		box-shadow: 0 2px 8px rgba(46, 196, 140, 0.1);
+	}
+
+	.verdict:focus-visible {
+		outline: 2px solid rgba(46, 196, 140, 0.6);
+		outline-offset: 2px;
+	}
+
+	.verdict:disabled {
+		opacity: 0.4;
+		cursor: not-allowed;
+		transform: none;
+		box-shadow: none;
 	}
 
 	.verdict--danger {
-		background: linear-gradient(135deg, rgba(255, 107, 107, 0.2), rgba(245, 196, 108, 0.18));
-		border-color: rgba(255, 107, 107, 0.32);
+		background: linear-gradient(135deg, rgba(230, 57, 70, 0.28), rgba(255, 107, 107, 0.22));
+		border-color: rgba(230, 57, 70, 0.5);
+		box-shadow: 0 4px 14px rgba(230, 57, 70, 0.12);
+	}
+
+	.verdict--danger:hover {
+		background: linear-gradient(135deg, rgba(230, 57, 70, 0.4), rgba(255, 107, 107, 0.32));
+		border-color: rgba(230, 57, 70, 0.7);
+		box-shadow: 0 8px 22px rgba(230, 57, 70, 0.2);
+	}
+
+	.verdict--danger:active {
+		box-shadow: 0 2px 8px rgba(230, 57, 70, 0.1);
 	}
 
 	.message-card {
@@ -1599,51 +1618,6 @@ async function resolveVerdict(choice: 'scam' | 'safe') {
 		padding-left: 1.1rem;
 		display: grid;
 		gap: 0.45rem;
-	}
-
-	.clue-board {
-		display: grid;
-		gap: 0.75rem;
-		margin-top: 0.85rem;
-	}
-
-	.sync-metrics {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.55rem;
-		margin-top: 0.85rem;
-	}
-
-	.sync-metrics span {
-		padding: 0.45rem 0.65rem;
-		border: 1px solid rgba(255, 255, 255, 0.08);
-		background: rgba(255, 255, 255, 0.04);
-		font-family: var(--font-mono, 'IBM Plex Mono', monospace);
-		font-size: 0.72rem;
-		letter-spacing: 0.12em;
-		text-transform: uppercase;
-	}
-
-	.clue-board article {
-		padding: 0.85rem;
-		border: 1px solid rgba(255, 255, 255, 0.08);
-		background: rgba(255, 255, 255, 0.03);
-	}
-
-	.clue-board article.locked {
-		border-color: rgba(125, 242, 201, 0.28);
-		background: rgba(125, 242, 201, 0.08);
-	}
-
-	.clue-board article div {
-		display: flex;
-		justify-content: space-between;
-		gap: 0.8rem;
-		align-items: center;
-	}
-
-	.clue-board article p {
-		margin-top: 0.55rem;
 	}
 
 	.result-screen {
@@ -1905,7 +1879,6 @@ async function resolveVerdict(choice: 'scam' | 'safe') {
 
 		.label,
 		.message-meta span,
-		.clue-board strong,
 		.result-clues span {
 			font-size: 0.62rem;
 			letter-spacing: 0.12em;
@@ -1953,7 +1926,6 @@ async function resolveVerdict(choice: 'scam' | 'safe') {
 		.result-grid article,
 		.tutorial-strip__steps article,
 		.briefing-card__grid article,
-		.clue-board article,
 		.result-clues article,
 		.ai-feedback-card,
 		.badge-card,
@@ -1980,10 +1952,6 @@ async function resolveVerdict(choice: 'scam' | 'safe') {
 
 		.briefing-card {
 			padding: 0.9rem;
-		}
-
-		.sync-metrics {
-			gap: 0.45rem;
 		}
 
 		.fallback-clues__grid {

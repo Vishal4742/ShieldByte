@@ -270,7 +270,7 @@
 
 	.training-app__grid {
 		display: grid;
-		grid-template-columns: minmax(0, 1.08fr) minmax(24rem, 0.92fr);
+		grid-template-columns: 1fr;
 		gap: 1rem;
 	}
 

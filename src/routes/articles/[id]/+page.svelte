@@ -280,7 +280,7 @@
 
 	.dossier-grid {
 		display: grid;
-		grid-template-columns: minmax(0, 1.15fr) minmax(18rem, 0.85fr);
+		grid-template-columns: 1fr;
 		gap: 1rem;
 		margin-top: 1rem;
 		align-items: start;

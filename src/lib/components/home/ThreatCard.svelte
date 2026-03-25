@@ -33,7 +33,7 @@
 <article class="threat-card">
 	<div class="threat-card__header">
 		<div class="threat-card__index">
-			<span>Case</span>
+			<span>Round</span>
 			<strong>{String(index + 1).padStart(2, '0')}</strong>
 		</div>
 
@@ -70,8 +70,13 @@
 	</ul>
 
 	<div class="threat-card__footer">
-		<a href={`/articles/${article.id}`} class="threat-card__primary">Open case</a>
-		<a href={article.url} target="_blank" rel="noreferrer">Source</a>
+		<a
+			href={`/play?article=${article.id}&type=${encodeURIComponent(article.category)}`}
+			class="threat-card__primary"
+		>
+			Deploy mission
+		</a>
+		<a href={`/articles/${article.id}`}>Open dossier</a>
 	</div>
 </article>
 
@@ -83,10 +88,12 @@
 		padding: 1.2rem;
 		border: 1px solid var(--line-soft);
 		background:
-			linear-gradient(140deg, rgba(242, 171, 90, 0.08), transparent 35%),
+			linear-gradient(140deg, rgba(255, 183, 77, 0.08), transparent 35%),
+			radial-gradient(circle at bottom right, rgba(114, 255, 214, 0.07), transparent 22%),
 			linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01)),
-			rgba(8, 12, 20, 0.82);
+			var(--surface-1);
 		min-height: 100%;
+		box-shadow: var(--shadow-arcade);
 		transition:
 			transform 180ms ease,
 			border-color 180ms ease,
@@ -96,7 +103,7 @@
 	.threat-card:hover,
 	.threat-card:focus-within {
 		transform: translateY(-2px);
-		border-color: rgba(242, 171, 90, 0.35);
+		border-color: rgba(255, 183, 77, 0.35);
 		box-shadow: 0 18px 40px rgba(0, 0, 0, 0.22);
 	}
 
@@ -176,6 +183,7 @@
 	.threat-card__tags li {
 		padding: 0.45rem 0.75rem;
 		background: rgba(255, 255, 255, 0.05);
+		border: 1px solid rgba(255, 255, 255, 0.06);
 		color: var(--text-strong);
 		font-size: 0.82rem;
 	}
@@ -186,7 +194,7 @@
 	}
 
 	.threat-card__primary {
-		color: var(--accent);
+		color: var(--accent-gold);
 	}
 
 	.threat-card__footer a:hover,

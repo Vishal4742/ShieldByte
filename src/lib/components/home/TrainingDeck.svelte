@@ -70,8 +70,8 @@
 <section class="training-app" id="mission">
 	<div class="training-app__header">
 		<div>
-			<p class="training-app__eyebrow">Mission board</p>
-			<h2>Play the case like a fraud analyst.</h2>
+			<p class="training-app__eyebrow">Practice arena</p>
+			<h2>Train the mission before you go live.</h2>
 		</div>
 
 		<div class="training-app__stats">
@@ -95,7 +95,7 @@
 			<section class="training-slate training-slate--intel">
 				<div class="slate-heading">
 					<div>
-						<p>Case intake</p>
+				<p>Mission dossier</p>
 						<h3>{article.title}</h3>
 					</div>
 					<a href={`/articles/${article.id}`}>Full brief</a>
@@ -110,7 +110,7 @@
 				<div class="message-window">
 					<header>
 						<span>Incoming scenario</span>
-						<strong>{mission ? 'Live simulation' : 'Classifier narrative'}</strong>
+						<strong>{mission ? 'Live simulation' : 'Training scenario'}</strong>
 					</header>
 
 					<div class="message-window__body">
@@ -141,7 +141,7 @@
 				<div class="slate-heading">
 					<div>
 						<p>Action grid</p>
-						<h3>Mark every scam signal you can justify.</h3>
+						<h3>Lock every signal you can defend.</h3>
 					</div>
 				</div>
 
@@ -163,12 +163,12 @@
 					<div class="progress-module">
 						<span>Session state</span>
 						<strong>{hasSubmitted ? 'Reviewed' : 'Active'}</strong>
-						<p>Select the signals you would stop and verify before responding.</p>
+						<p>Lock the signals you would stop before a real player loses shields.</p>
 					</div>
 
 					<div class="action-stack">
 						<button type="button" class="action-primary" onclick={reviewAnswers}>Reveal evaluation</button>
-						<button type="button" class="action-secondary" onclick={resetExercise}>Restart run</button>
+						<button type="button" class="action-secondary" onclick={resetExercise}>Reset drill</button>
 					</div>
 				</div>
 
@@ -254,8 +254,10 @@
 		padding: 1rem;
 		border: 1px solid var(--line-soft);
 		background:
+			radial-gradient(circle at top right, rgba(114, 255, 214, 0.08), transparent 24%),
 			linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01)),
-			rgba(10, 13, 21, 0.82);
+			var(--surface-1);
+		box-shadow: var(--shadow-arcade);
 	}
 
 	.training-app__stats strong {
@@ -277,10 +279,12 @@
 		padding: 1.3rem;
 		border: 1px solid var(--line-soft);
 		background:
-			radial-gradient(circle at top right, rgba(242, 171, 90, 0.14), transparent 28%),
+			radial-gradient(circle at top right, rgba(255, 183, 77, 0.14), transparent 28%),
+			radial-gradient(circle at bottom left, rgba(114, 255, 214, 0.06), transparent 22%),
 			linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01)),
-			rgba(9, 12, 19, 0.86);
+			var(--surface-2);
 		overflow: hidden;
+		box-shadow: var(--shadow-arcade);
 	}
 
 	.training-slate::before {
@@ -402,8 +406,8 @@
 	.signal-grid button:focus-visible,
 	.signal-grid button.selected {
 		transform: translateY(-1px);
-		border-color: rgba(242, 171, 90, 0.52);
-		background: rgba(242, 171, 90, 0.08);
+		border-color: rgba(255, 183, 77, 0.52);
+		background: rgba(255, 183, 77, 0.08);
 	}
 
 	.signal-grid span,
@@ -466,8 +470,8 @@
 	}
 
 	.action-primary {
-		background: var(--accent);
-		color: var(--surface-strong);
+		background: linear-gradient(135deg, var(--accent-gold), #ffd48a);
+		color: #0b111b;
 		border-color: transparent;
 	}
 

@@ -26,17 +26,17 @@
 			: 0
 	);
 	const liveOps = $derived([
-		{ label: 'Detection streak', value: `${String(Math.max(totalClues - 2, 0)).padStart(2, '0')} clears` },
-		{ label: 'Source spread', value: `${String(uniqueSources).padStart(2, '0')} feeds` },
-		{ label: 'Threat confidence', value: `${String(confidenceScore).padStart(2, '0')}%` }
+		{ label: 'Combo streak', value: `${String(Math.max(totalClues - 2, 0)).padStart(2, '0')} clears` },
+		{ label: 'Case spread', value: `${String(uniqueSources).padStart(2, '0')} feeds` },
+		{ label: 'Board heat', value: `${String(confidenceScore).padStart(2, '0')}%` }
 	]);
 </script>
 
 <section class="hero">
 	<div class="hero__column hero__column--primary">
 		<div class="hero__badge-row">
-			<p class="hero__eyebrow">ShieldByte command deck</p>
-			<span class="hero__live"><i></i> Live training stream</span>
+			<p class="hero__eyebrow">ShieldByte arcade deck</p>
+			<span class="hero__live"><i></i> Live mission queue</span>
 		</div>
 
 		<h1>
@@ -46,13 +46,13 @@
 		</h1>
 
 		<p class="hero__lede">
-			A gamified cyber-fraud operations board that turns live reporting into case files, simulated
-			missions, and repeatable pattern training for everyday scam defense.
+			Train like a player, not a reader. ShieldByte turns messy real scam reports into fast rounds,
+			case boards, and repeatable pattern drills for everyday scam defense.
 		</p>
 
 		<div class="hero__actions">
-			<a href="#mission" class="hero__primary">Launch mission board</a>
-			<a href="#feed" class="hero__secondary">Browse active cases</a>
+			<a href="/play" class="hero__primary">Start scam hunt</a>
+			<a href="#feed" class="hero__secondary">Browse case board</a>
 		</div>
 
 		<div class="hero__ticker">
@@ -105,11 +105,13 @@
 		padding: 1.4rem;
 		border: 1px solid var(--line-soft);
 		background:
-			radial-gradient(circle at top left, rgba(242, 171, 90, 0.16), transparent 24%),
+			radial-gradient(circle at top left, rgba(255, 183, 77, 0.16), transparent 24%),
+			radial-gradient(circle at bottom right, rgba(114, 255, 214, 0.08), transparent 20%),
 			linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.01)),
-			rgba(8, 11, 18, 0.82);
+			var(--surface-1);
 		backdrop-filter: blur(18px);
 		overflow: hidden;
+		box-shadow: var(--shadow-arcade);
 	}
 
 	.hero__column::before {
@@ -162,8 +164,8 @@
 		width: 0.5rem;
 		height: 0.5rem;
 		border-radius: 999px;
-		background: var(--accent);
-		box-shadow: 0 0 14px rgba(242, 171, 90, 0.9);
+		background: var(--accent-gold);
+		box-shadow: 0 0 14px rgba(255, 183, 77, 0.9);
 		animation: pulse 1.7s ease-in-out infinite;
 	}
 
@@ -178,7 +180,7 @@
 
 	h1 span {
 		display: block;
-		color: var(--accent-soft);
+		color: #ffe2b7;
 		font-style: italic;
 		transform: translateX(1.4rem);
 	}
@@ -221,13 +223,15 @@
 	}
 
 	.hero__primary {
-		background: var(--accent);
-		color: var(--surface-strong);
+		background: linear-gradient(135deg, var(--accent-gold), #ffd48a);
+		color: #0b111b;
+		box-shadow: 0 18px 32px rgba(255, 183, 77, 0.18);
 	}
 
 	.hero__secondary {
 		border: 1px solid var(--line-strong);
 		color: var(--text-strong);
+		background: rgba(255, 255, 255, 0.03);
 	}
 
 	.hero__ticker {
@@ -268,7 +272,7 @@
 		min-height: 16rem;
 		border: 1px solid rgba(255, 255, 255, 0.08);
 		background:
-			radial-gradient(circle, rgba(242, 171, 90, 0.08) 0 14%, transparent 15% 100%),
+			radial-gradient(circle, rgba(255, 183, 77, 0.08) 0 14%, transparent 15% 100%),
 			radial-gradient(circle at center, rgba(255, 255, 255, 0.05), transparent 66%);
 	}
 

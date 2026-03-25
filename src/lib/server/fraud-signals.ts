@@ -356,6 +356,10 @@ const NON_SCAM_CONTEXT_PATTERNS: WeightedPattern[] = [
 	{ pattern: 'fight fraud', weight: 3 },
 	{ pattern: 'fraud prevention', weight: 4 },
 	{ pattern: 'prevent fraud', weight: 3 },
+	{ pattern: 'warn consumers', weight: 4 },
+	{ pattern: 'warning for', weight: 3 },
+	{ pattern: 'stay vigilant', weight: 3 },
+	{ pattern: 'verify through official channels', weight: 5 },
 	{ pattern: 'anti money laundering', weight: 5 },
 	{ pattern: 'money laundering', weight: 4 },
 	{ pattern: 'awareness campaign', weight: 4 },
@@ -363,7 +367,10 @@ const NON_SCAM_CONTEXT_PATTERNS: WeightedPattern[] = [
 	{ pattern: 'proposal', weight: 1 },
 	{ pattern: 'guidelines', weight: 2 },
 	{ pattern: 'advisory', weight: 3 },
+	{ pattern: 'explainer', weight: 4 },
+	{ pattern: '5 things to know', weight: 5 },
 	{ pattern: 'policy', weight: 2 },
+	{ pattern: 'privacy policy', weight: 5 },
 	{ pattern: 'compliance', weight: 3 },
 	{ pattern: 'tooling', weight: 2 },
 	{ pattern: 'software', weight: 1 },
@@ -381,8 +388,26 @@ const NON_SCAM_CONTEXT_PATTERNS: WeightedPattern[] = [
 	{ pattern: 'delegation', weight: 2 },
 	{ pattern: 'announcement', weight: 2 },
 	{ pattern: 'announces', weight: 2 },
+	{ pattern: 'partnership', weight: 3 },
+	{ pattern: 'high court', weight: 4 },
+	{ pattern: 'consumer court', weight: 4 },
+	{ pattern: 'denies bail', weight: 4 },
+	{ pattern: 'police', weight: 2 },
+	{ pattern: 'cbi', weight: 3 },
+	{ pattern: 'crime gang', weight: 4 },
+	{ pattern: 'mule account', weight: 4 },
+	{ pattern: 'mule accounts', weight: 4 },
 	{ pattern: 'ministry', weight: 3 },
 	{ pattern: 'railways', weight: 3 },
+	{ pattern: 'government', weight: 2 },
+	{ pattern: 'malicious smses', weight: 4 },
+	{ pattern: 'how can i', weight: 4 },
+	{ pattern: 'need advice', weight: 4 },
+	{ pattern: 'questions about', weight: 4 },
+	{ pattern: 'confused about next steps', weight: 5 },
+	{ pattern: 'is it legit', weight: 5 },
+	{ pattern: 'warranty issue', weight: 5 },
+	{ pattern: 'issue', weight: 1 },
 	{ pattern: 'pm-kisan', weight: 5 },
 	{ pattern: 'घोषणा', weight: 3 },
 	{ pattern: 'कार्यशाला', weight: 3 },
@@ -396,6 +421,7 @@ const NON_SCAM_CONTEXT_PATTERNS: WeightedPattern[] = [
 const SCAM_INCIDENT_PATTERNS: WeightedPattern[] = [
 	{ pattern: 'victim', weight: 2 },
 	{ pattern: 'scammers', weight: 2 },
+	{ pattern: 'fraudsters', weight: 2 },
 	{ pattern: 'posed as', weight: 3 },
 	{ pattern: 'pretending to be', weight: 3 },
 	{ pattern: 'duped', weight: 3 },
@@ -409,7 +435,42 @@ const SCAM_INCIDENT_PATTERNS: WeightedPattern[] = [
 	{ pattern: 'collect request', weight: 4 },
 	{ pattern: 'remote access', weight: 4 },
 	{ pattern: 'job offer', weight: 2 },
-	{ pattern: 'guaranteed return', weight: 4 }
+	{ pattern: 'guaranteed return', weight: 4 },
+	{ pattern: 'daily profits', weight: 5 },
+	{ pattern: 'fake payment screenshots', weight: 5 },
+	{ pattern: 'malicious sms', weight: 3 }
+];
+
+const DIRECT_SCAM_MECHANISM_PATTERNS = [
+	'collect request',
+	'request money',
+	'payment request',
+	'qr code',
+	'upi id',
+	'kyc update',
+	'account blocked',
+	'account freeze',
+	'update aadhaar',
+	'update pan',
+	'you have won',
+	'lucky draw',
+	'prize money',
+	'telegram task',
+	'registration fee',
+	'pay to join',
+	'joining fee',
+	'guaranteed return',
+	'daily profits',
+	'trading group',
+	'double your money',
+	'customer care number',
+	'helpline number',
+	'install anydesk',
+	'install teamviewer',
+	'remote access',
+	'refund support',
+	'shared otp',
+	'fake payment screenshots'
 ];
 
 function normalizeText(...values: Array<string | null | undefined>): string {
@@ -546,10 +607,53 @@ export function assessFraudRelevance(
 	const positiveHits = findWeightedHits(text, SCAM_INCIDENT_PATTERNS);
 	const negativeScore = negativeHits.reduce((sum, entry) => sum + entry.weight, 0);
 	const positiveScore = positiveHits.reduce((sum, entry) => sum + entry.weight, 0) + signalAnalysis.relevanceScore * 4;
+	const hasDirectMechanism = DIRECT_SCAM_MECHANISM_PATTERNS.some((pattern) => text.includes(pattern));
+	const hasQuestionLikeNoise =
+		text.includes('is it legit') ||
+		text.includes('is this a scam') ||
+		text.includes('need advice') ||
+		text.includes('questions about') ||
+		text.includes('how can i') ||
+		text.includes('confused about next steps');
+	const hasCrimeOrPolicyFrame =
+		text.includes('police') ||
+		text.includes('cbi') ||
+		text.includes('high court') ||
+		text.includes('consumer court') ||
+		text.includes('denies bail') ||
+		text.includes('advisory') ||
+		text.includes('explainer') ||
+		text.includes('privacy policy');
 	const reasons = unique([
 		...negativeHits.map((entry) => `non_scam:${entry.pattern}`),
 		...positiveHits.map((entry) => `scam:${entry.pattern}`)
 	]).slice(0, 8);
+
+	if (!hasDirectMechanism && negativeScore >= 5 && positiveScore < 8) {
+		return {
+			isRelevant: false,
+			confidence: Number(
+				Math.min(0.98, 0.76 + Math.min(0.18, (negativeScore - Math.min(positiveScore, 4)) * 0.03)).toFixed(2)
+			),
+			reasons
+		};
+	}
+
+	if (!hasDirectMechanism && hasQuestionLikeNoise && negativeScore >= 3) {
+		return {
+			isRelevant: false,
+			confidence: 0.82,
+			reasons
+		};
+	}
+
+	if (!hasDirectMechanism && hasCrimeOrPolicyFrame && negativeScore >= positiveScore) {
+		return {
+			isRelevant: false,
+			confidence: 0.81,
+			reasons
+		};
+	}
 
 	if (negativeScore >= positiveScore + 3) {
 		return {
@@ -766,8 +870,10 @@ export function determineReviewStatus(params: {
 	categoryHint: FraudCategory | null;
 	result: ClassificationResult;
 	signalStrength?: FraudSignalAnalysis['signalStrength'];
+	scoreMargin?: number;
+	relevanceScore?: number;
 }): 'auto_approved' | 'needs_review' {
-	const { confidence, method, categoryHint, result, signalStrength } = params;
+	const { confidence, method, categoryHint, result, signalStrength, scoreMargin = 0, relevanceScore = 0 } = params;
 
 	if (method !== 'ai') {
 		return 'needs_review';
@@ -777,5 +883,17 @@ export function determineReviewStatus(params: {
 		return 'needs_review';
 	}
 
-	return confidence >= 0.86 ? 'auto_approved' : 'needs_review';
+	if (signalStrength !== 'strong') {
+		return 'needs_review';
+	}
+
+	if (scoreMargin < 2) {
+		return 'needs_review';
+	}
+
+	if (relevanceScore < 0.55) {
+		return 'needs_review';
+	}
+
+	return confidence >= 0.9 ? 'auto_approved' : 'needs_review';
 }

@@ -42,62 +42,67 @@
 </script>
 
 <svelte:head>
-	<title>{article.title} | ShieldByte Intelligence</title>
-	<meta
-		name="description"
-		content={article.scenarioSummary}
-	/>
+	<title>{article.title} | ShieldByte Mission Dossier</title>
+	<meta name="description" content={article.scenarioSummary} />
 </svelte:head>
 
-<div class="brief-shell">
-	<header class="brief-header">
-		<a href="/">ShieldByte</a>
+<div class="dossier-shell">
+	<header class="dossier-head">
 		<div>
+			<p>Mission dossier</p>
+			<h1>{article.title}</h1>
+		</div>
+		<div class="dossier-head__meta">
 			<span>{categoryLabels[article.category] ?? article.category}</span>
 			<span>{formatDate(article.publishedAt)}</span>
 		</div>
 	</header>
 
-	<main class="brief-grid">
-		<section class="brief-hero">
-			<p class="eyebrow">Article intelligence brief</p>
-			<h1>{article.title}</h1>
+	<section class="dossier-hero">
+		<div class="dossier-hero__summary">
+			<p class="eyebrow">Round setup</p>
 			<p class="lede">{article.scenarioSummary}</p>
 
-			<div class="meta-grid">
-				<article>
-					<span>Source</span>
-					<strong>{article.source}</strong>
-				</article>
-				<article>
-					<span>Channel</span>
-					<strong>{article.channel}</strong>
-				</article>
-				<article>
-					<span>Confidence</span>
-					<strong>{formatConfidence(article.confidence)}</strong>
-				</article>
+			<div class="dossier-hero__actions">
+				<a href={`/play?article=${article.id}&type=${encodeURIComponent(article.category)}`}>
+					Deploy mission
+				</a>
+				<a href={article.url} target="_blank" rel="noreferrer" class="dossier-hero__secondary">
+					Read source report
+				</a>
 			</div>
+		</div>
 
-			<div class="actions">
-				<a href={article.url} target="_blank" rel="noreferrer">Read original report</a>
-				<a href="/">Back to threat feed</a>
-			</div>
-		</section>
+		<div class="dossier-hero__scoreboard">
+			<article>
+				<span>Source</span>
+				<strong>{article.source}</strong>
+			</article>
+			<article>
+				<span>Channel</span>
+				<strong>{article.channel}</strong>
+			</article>
+			<article>
+				<span>Classifier read</span>
+				<strong>{formatConfidence(article.confidence)}</strong>
+			</article>
+		</div>
+	</section>
 
+	<main class="dossier-grid">
 		<aside class="sidebar">
 			<section class="panel">
-				<p class="panel__label">Victim profile</p>
+				<p class="panel__label">Target profile</p>
 				<p>{article.victimProfile}</p>
 			</section>
 
 			<section class="panel">
-				<p class="panel__label">Defensive tip</p>
+				<p class="panel__label">Coach tip</p>
 				<p>{article.tip}</p>
 			</section>
 
 			<section class="panel">
-				<p class="panel__label">Red flags</p>
+				<p class="panel__label">Live flags</p>
 				<ul class="chips">
 					{#each article.redFlags as redFlag}
 						<li>{redFlag}</li>
@@ -108,8 +113,8 @@
 
 		<section class="panel panel--wide">
 			<div class="section-heading">
-				<p>Extracted clues</p>
-				<h2>What the classifier surfaced</h2>
+				<p>Signal board</p>
+				<h2>What players should catch in the round</h2>
 			</div>
 
 			<div class="clue-grid">
@@ -128,19 +133,17 @@
 
 		<section class="panel panel--wide">
 			<div class="section-heading">
-				<p>Article body</p>
-				<h2>Stored report content</h2>
+				<p>Case transcript</p>
+				<h2>Stored source copy behind the mission</h2>
 			</div>
 
-			<div class="body-copy">
-				{article.body}
-			</div>
+			<div class="body-copy">{article.body}</div>
 		</section>
 
 		<section class="panel panel--wide">
 			<div class="section-heading">
-				<p>Raw extraction</p>
-				<h2>Defensive parser view</h2>
+				<p>Parser log</p>
+				<h2>Structured fields captured from the article</h2>
 			</div>
 
 			{#if article.rawExtractionFields.length > 0}
@@ -161,41 +164,33 @@
 					{/each}
 				</div>
 			{:else}
-				<p class="empty-copy">No structured extraction fields were available for this article.</p>
+				<p class="empty-copy">No structured extraction fields were available for this dossier.</p>
 			{/if}
 		</section>
 	</main>
 </div>
 
 <style>
-	:global(body) {
-		margin: 0;
-		background:
-			radial-gradient(circle at top, rgba(242, 171, 90, 0.14), transparent 24%),
-			#05070b;
-		color: #f6f1e8;
-		font-family: 'Cormorant Garamond', serif;
+	.dossier-shell {
+		padding: 1.25rem clamp(1.2rem, 4vw, 3rem) 4rem;
 	}
 
-	.brief-shell {
-		--font-display: 'Cormorant Garamond', serif;
-		--font-mono: 'IBM Plex Mono', monospace;
-		--surface-strong: #0b0d12;
-		--line-soft: rgba(255, 255, 255, 0.12);
-		--text-strong: rgba(250, 247, 241, 0.96);
-		--text-soft: rgba(235, 226, 212, 0.78);
-		--text-muted: rgba(235, 226, 212, 0.5);
-		--accent: #f2ab5a;
-		--accent-soft: #ffd79b;
-		min-height: 100vh;
-		padding: 0 clamp(1.2rem, 4vw, 3rem) 4rem;
+	.dossier-head,
+	.dossier-head__meta,
+	.section-heading,
+	.clue-card__topline,
+	.dossier-hero__actions {
+		display: flex;
+		justify-content: space-between;
+		gap: 1rem;
+		align-items: flex-start;
 	}
 
-	.brief-header,
+	.dossier-head p,
+	.dossier-head__meta span,
 	.section-heading p,
 	.panel__label,
 	.eyebrow,
-	.meta-grid span,
 	.clue-card__topline span,
 	.field-card span {
 		font-family: var(--font-mono);
@@ -205,50 +200,53 @@
 		color: var(--text-muted);
 	}
 
-	.brief-header {
-		display: flex;
-		justify-content: space-between;
-		gap: 1rem;
-		align-items: center;
-		padding: 1.2rem 0;
+	.dossier-head {
+		margin-top: 0.3rem;
 	}
 
-	.brief-header a,
-	.actions a {
-		color: var(--text-strong);
-		text-decoration: none;
-	}
-
-	.brief-header div,
-	.actions {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 1rem;
-	}
-
-	.brief-grid {
-		display: grid;
-		grid-template-columns: minmax(0, 1.15fr) minmax(18rem, 0.85fr);
-		gap: 1.5rem;
-		align-items: start;
-	}
-
-	.brief-hero,
-	.panel {
-		padding: 1.3rem;
-		border: 1px solid var(--line-soft);
-		background:
-			linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01)),
-			rgba(7, 10, 16, 0.84);
-	}
-
-	.brief-hero h1,
+	.dossier-head h1,
 	.section-heading h2 {
-		margin: 0.5rem 0 1rem;
+		margin: 0.45rem 0 0;
 		font-family: var(--font-display);
 		font-size: clamp(2.6rem, 6vw, 5rem);
 		font-weight: 500;
 		line-height: 0.94;
+	}
+
+	.dossier-head__meta {
+		flex-wrap: wrap;
+	}
+
+	.dossier-head__meta span,
+	.dossier-hero__scoreboard article,
+	.panel,
+	.clue-card,
+	.field-card {
+		padding: 0.9rem 1rem;
+		border: 1px solid var(--line-soft);
+		background:
+			linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01)),
+			var(--surface-1);
+		box-shadow: var(--shadow-arcade);
+	}
+
+	.dossier-hero {
+		display: grid;
+		grid-template-columns: minmax(0, 1.2fr) minmax(18rem, 0.8fr);
+		gap: 1rem;
+		margin-top: 1rem;
+	}
+
+	.dossier-hero__summary,
+	.dossier-hero__scoreboard {
+		padding: 1.2rem;
+		border: 1px solid var(--line-soft);
+		background:
+			radial-gradient(circle at top right, rgba(255, 183, 77, 0.1), transparent 24%),
+			radial-gradient(circle at bottom left, rgba(114, 255, 214, 0.06), transparent 18%),
+			linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01)),
+			var(--surface-2);
+		box-shadow: var(--shadow-arcade);
 	}
 
 	.lede,
@@ -262,44 +260,80 @@
 		line-height: 1.75;
 	}
 
-	.meta-grid,
-	.clue-grid,
-	.extraction-grid {
-		display: grid;
-		grid-template-columns: repeat(3, minmax(0, 1fr));
-		gap: 1rem;
+	.lede {
+		margin: 0.55rem 0 0;
+		font-size: 1.02rem;
 	}
 
-	.meta-grid {
-		margin: 1.8rem 0 1.4rem;
+	.dossier-hero__actions {
+		margin-top: 1.4rem;
 	}
 
-	.meta-grid article,
-	.clue-card,
-	.field-card {
-		padding: 1rem;
+	.dossier-hero__actions a {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		min-height: 3rem;
+		padding: 0 1.2rem;
+		text-decoration: none;
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		letter-spacing: 0.16em;
+		text-transform: uppercase;
+	}
+
+	.dossier-hero__actions a:first-child {
+		background: linear-gradient(135deg, var(--accent-gold), #ffd48a);
+		color: #091018;
+	}
+
+	.dossier-hero__secondary {
 		border: 1px solid rgba(255, 255, 255, 0.08);
 		background: rgba(255, 255, 255, 0.03);
+		color: var(--text-strong);
 	}
 
-	.meta-grid strong,
-	.clue-card strong {
+	.dossier-hero__scoreboard {
+		display: grid;
+		gap: 0.85rem;
+	}
+
+	.dossier-hero__scoreboard span {
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		letter-spacing: 0.16em;
+		text-transform: uppercase;
+		color: var(--text-muted);
+	}
+
+	.dossier-hero__scoreboard strong {
 		display: block;
-		margin-top: 0.5rem;
+		margin-top: 0.45rem;
+		font-size: 1.1rem;
+		color: var(--text-strong);
+	}
+
+	.dossier-grid {
+		display: grid;
+		grid-template-columns: minmax(0, 1.15fr) minmax(18rem, 0.85fr);
+		gap: 1.25rem;
+		margin-top: 1.25rem;
+		align-items: start;
 	}
 
 	.sidebar {
 		display: grid;
-		gap: 1.5rem;
+		gap: 1rem;
 	}
 
 	.panel--wide {
 		grid-column: 1 / -1;
 	}
 
-	.clue-card__topline {
-		display: flex;
-		justify-content: space-between;
+	.clue-grid,
+	.extraction-grid {
+		display: grid;
+		grid-template-columns: repeat(3, minmax(0, 1fr));
 		gap: 1rem;
 	}
 
@@ -329,11 +363,17 @@
 	}
 
 	@media (max-width: 960px) {
-		.brief-grid,
-		.meta-grid,
+		.dossier-head,
+		.dossier-hero,
+		.dossier-grid,
 		.clue-grid,
 		.extraction-grid {
 			grid-template-columns: 1fr;
+		}
+
+		.dossier-head,
+		.dossier-hero__actions {
+			flex-direction: column;
 		}
 	}
 </style>

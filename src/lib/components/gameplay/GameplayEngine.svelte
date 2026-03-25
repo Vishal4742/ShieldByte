@@ -78,10 +78,65 @@
 	let tickTimer: number | undefined;
 	let livesTimer: number | undefined;
 	let flashTimer: number | undefined;
+	let swipeOffsetX = $state(0);
+	let swipeDragging = $state(false);
+	let swipePointerId = $state<number | null>(null);
+	let swipeStartX = $state(0);
+	let comboChain = $state(0);
+	let bestCombo = $state(0);
+	const missionLabel = $derived(mission.fraudType.replaceAll('_', ' '));
+	const beginnerSteps = [
+		'Tap only the risky words or phrases in the message.',
+		'Each wrong tap breaks one shield.',
+		'Clear every red flag before the round clock hits zero.'
+	];
 
 	const allCluesFound = $derived(foundIds.length === mission.clues.length);
 	const timerTone = $derived(secondsRemaining <= LOW_TIME_THRESHOLD_SECONDS ? 'critical' : 'steady');
 	const hasLives = $derived(livesState.lives > 0);
+	const completionPercent = $derived(Math.round((foundIds.length / mission.clues.length) * 100));
+	const shieldDisplay = $derived(Array.from({ length: 3 }, (_, index) => index < livesState.lives));
+	const swipeDecision = $derived.by(() => {
+		if (swipeOffsetX > 70) return 'start';
+		if (swipeOffsetX < -70) return 'skip';
+		return null;
+	});
+	const swipeRotation = $derived(Math.max(-14, Math.min(14, swipeOffsetX / 18)));
+	const comboLabel = $derived(comboChain >= 3 ? 'Hot streak' : comboChain > 0 ? 'Building' : 'Cold start');
+	const threatPercent = $derived.by(() => {
+		if (result) {
+			if (result.outcome === 'success') return 18;
+			if (result.outcome === 'timeout') return 82;
+			return 100;
+		}
+
+		const timerPressure = ((MISSION_DURATION_SECONDS - secondsRemaining) / MISSION_DURATION_SECONDS) * 68;
+		const mistakePressure = wrongTaps * 14;
+		return Math.min(100, Math.max(12, Math.round(timerPressure + mistakePressure + 12)));
+	});
+	const threatStatus = $derived.by(() => {
+		if (threatPercent < 34) return 'stable';
+		if (threatPercent < 68) return 'rising';
+		return 'critical';
+	});
+	const threatLabel = $derived.by(() => {
+		if (threatStatus === 'stable') return 'Threat contained';
+		if (threatStatus === 'rising') return 'Threat rising';
+		return 'Threat critical';
+	});
+	const resultGrade = $derived.by(() => {
+		if (!result) return null;
+		if (result.outcome === 'success' && result.wrongTaps === 0 && result.secondsRemaining >= 20) {
+			return 'Perfect Clear';
+		}
+		if (result.outcome === 'success') {
+			return 'Clean Save';
+		}
+		if (result.outcome === 'timeout') {
+			return 'Close Call';
+		}
+		return 'Breach';
+	});
 	const nextHint = $derived(
 		mission.clues.find((clue) => !foundIds.includes(clue.id))?.explanation ??
 			'No clues remain. Finish the run.'
@@ -117,6 +172,83 @@
 			}
 		} catch (err) {
 			console.warn('[GameplayEngine] Lives sync failed, using optimistic state:', err);
+		}
+	}
+
+	function beginMission() {
+		if (missionState === 'active' || result || livesState.lives <= 0) {
+			return;
+		}
+
+		missionState = 'active';
+		paused = false;
+		feedbackTitle = 'Mission live';
+		feedbackBody = 'Incoming message intercepted. Tap only the parts that would put a real player at risk.';
+		swipeOffsetX = 0;
+		swipeDragging = false;
+		startTimers();
+	}
+
+	function handleBriefingPointerDown(event: PointerEvent) {
+		if (missionState !== 'ready' || result) {
+			return;
+		}
+
+		swipeDragging = true;
+		swipePointerId = event.pointerId;
+		swipeStartX = event.clientX - swipeOffsetX;
+		(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+	}
+
+	function handleBriefingPointerMove(event: PointerEvent) {
+		if (!swipeDragging || swipePointerId !== event.pointerId) {
+			return;
+		}
+
+		swipeOffsetX = Math.max(-180, Math.min(180, event.clientX - swipeStartX));
+	}
+
+	function resolveBriefingSwipe() {
+		if (swipeOffsetX > 120) {
+			beginMission();
+			return;
+		}
+
+		if (swipeOffsetX < -120) {
+			if (browser) {
+				window.location.assign('/play');
+			}
+			return;
+		}
+
+		swipeOffsetX = 0;
+	}
+
+	function handleBriefingPointerUp(event: PointerEvent) {
+		if (swipePointerId !== event.pointerId) {
+			return;
+		}
+
+		swipeDragging = false;
+		swipePointerId = null;
+		resolveBriefingSwipe();
+	}
+
+	function handleBriefingKeydown(event: KeyboardEvent) {
+		if (missionState !== 'ready' || result) {
+			return;
+		}
+
+		if (event.key === 'ArrowRight' || event.key === 'Enter' || event.key === ' ') {
+			event.preventDefault();
+			beginMission();
+		}
+
+		if (event.key === 'ArrowLeft') {
+			event.preventDefault();
+			if (browser) {
+				window.location.assign('/play');
+			}
 		}
 	}
 
@@ -371,7 +503,9 @@
 			}
 
 			foundIds = [...foundIds, segment.clueId];
-			pulseFeedback('correct', 'Verified clue', segment.clue.explanation);
+			comboChain += 1;
+			bestCombo = Math.max(bestCombo, comboChain);
+			pulseFeedback('correct', 'Nice catch', segment.clue.explanation);
 
 			if (foundIds.length + 1 === mission.clues.length) {
 				finishMission('success');
@@ -385,8 +519,9 @@
 		}
 
 		wrongTaps += 1;
+		comboChain = 0;
 		const nextLives = consumeLife(livesState, Date.now());
-		pulseFeedback('wrong', 'False flag', nextHint);
+		pulseFeedback('wrong', 'Careful', nextHint);
 
 		// Await server confirmation of lives decrement
 		await persistLives(nextLives);
@@ -414,6 +549,8 @@
 
 		foundIds = [];
 		wrongTaps = 0;
+		comboChain = 0;
+		bestCombo = 0;
 		secondsRemaining = MISSION_DURATION_SECONDS;
 		paused = false;
 		result = null;
@@ -425,17 +562,16 @@
 		feedbackError = false;
 		newBadges = [];
 		rankUp = null;
+		swipeOffsetX = 0;
+		swipeDragging = false;
+		swipePointerId = null;
 		flashState = 'idle';
 		feedbackTitle = livesState.lives > 0 ? 'Mission ready' : 'No shields available';
 		feedbackBody =
 			livesState.lives > 0
-				? 'Tap the scam clues inside the message before the clock runs out.'
-				: 'Wait for a shield to regenerate before starting another run.';
-		missionState = livesState.lives > 0 ? 'active' : 'ready';
-
-		if (livesState.lives > 0) {
-			startTimers();
-		}
+				? 'Read the briefing, then start the round when you are ready.'
+				: 'Wait for a shield to recharge before starting a new round.';
+		missionState = 'ready';
 	}
 
 	function togglePause() {
@@ -444,10 +580,10 @@
 		}
 
 		paused = !paused;
-		feedbackTitle = paused ? 'Mission paused' : 'Mission resumed';
+		feedbackTitle = paused ? 'Round paused' : 'Round resumed';
 		feedbackBody = paused
-			? 'The countdown is paused. Resume when you are ready to keep hunting.'
-			: 'The countdown is live again. Keep tracking the suspicious details.';
+			? 'Take a breath. Resume when you are ready to keep hunting.'
+			: 'The clock is running again. Keep looking for scam signals.';
 	}
 
 	onMount(() => {
@@ -470,14 +606,12 @@
 				console.warn('[GameplayEngine] Failed to fetch server lives:', err);
 			}
 
-			missionState = livesState.lives > 0 ? 'active' : 'ready';
-			feedbackTitle = livesState.lives > 0 ? 'Mission live' : 'No shields available';
+			missionState = 'ready';
+			feedbackTitle = livesState.lives > 0 ? 'Mission briefing' : 'No shields available';
 			feedbackBody =
 				livesState.lives > 0
-					? 'Tap the suspicious text fragments directly inside the message bubble.'
-					: 'You are out of shields. Wait for a shield to regenerate or come back later.';
-
-			startTimers();
+					? 'Read the setup, check your shields, then hit start when you are ready to defend the player.'
+					: 'You are out of shields. Wait for one to recharge or come back later.';
 		})();
 
 		return () => {
@@ -492,26 +626,42 @@
 <section class="gameplay-shell">
 	<header class="mission-strip">
 		<div>
-			<p class="label">Live mission</p>
-			<h1>{mission.fraudType.replaceAll('_', ' ')} intercept</h1>
+			<p class="label">Round live</p>
+			<h1>{mission.fraudType.replaceAll('_', ' ')} challenge</h1>
 			<p class="intro">
-				Flag the exact phrases that make this message dangerous. One wrong tap costs a shield.
+				Spot the scam before it tricks the player. Tap the exact risky phrases. One wrong tap costs a shield, so play for precision instead of speed panic.
 			</p>
 		</div>
 
 		<div class="mission-strip__controls">
-			<a class="ghost-link" href="/play">Load another mission</a>
+			<a class="ghost-link" href="/play">New round</a>
 			<button type="button" class="ghost-button" onclick={togglePause}>
-				{paused ? 'Resume mission' : 'Pause mission'}
+				{paused ? 'Resume round' : 'Pause round'}
 			</button>
 		</div>
 	</header>
 
+	<section class="tutorial-strip" aria-label="How to play">
+		<div class="tutorial-strip__hero">
+			<p class="label">How to play</p>
+			<h2>Read, tap, survive</h2>
+			<p>New players should understand this round in a few seconds.</p>
+		</div>
+		<div class="tutorial-strip__steps">
+			{#each beginnerSteps as step, index}
+				<article>
+					<span>{index + 1}</span>
+					<p>{step}</p>
+				</article>
+			{/each}
+		</div>
+	</section>
+
 	<div class="status-grid">
 		<article class:critical={timerTone === 'critical'}>
-			<span class="label">Timer</span>
+			<span class="label">Time left</span>
 			<strong>{String(secondsRemaining).padStart(2, '0')}s</strong>
-			<p>{timerTone === 'critical' ? 'Threat window collapsing' : 'Clock is stable'}</p>
+			<p>{timerTone === 'critical' ? 'Final seconds. Trust your instincts.' : 'Stay calm and read carefully.'}</p>
 		</article>
 		<article>
 			<span class="label">Shields</span>
@@ -519,14 +669,24 @@
 			<p>{lifeCountdownLabel}</p>
 		</article>
 		<article>
-			<span class="label">Clues found</span>
+			<span class="label">Progress</span>
 			<strong>{foundIds.length}/{mission.clues.length}</strong>
-			<p>{wrongTaps} wrong tap{wrongTaps === 1 ? '' : 's'}</p>
+			<p>{completionPercent}% cleared</p>
 		</article>
 		<article>
-			<span class="label">Streak boost</span>
+			<span class="label">Combo boost</span>
 			<strong>{Math.min(1 + streakDays * 0.1, 2).toFixed(1)}x</strong>
 			<p>{streakDays} day streak applied</p>
+		</article>
+		<article>
+			<span class="label">Combo chain</span>
+			<strong>x{Math.max(comboChain, 1)}</strong>
+			<p>{comboLabel}</p>
+		</article>
+		<article class:critical={threatStatus === 'critical'}>
+			<span class="label">Threat meter</span>
+			<strong>{threatPercent}%</strong>
+			<p>{threatLabel}</p>
 		</article>
 	</div>
 
@@ -534,12 +694,12 @@
 		<section class:critical={timerTone === 'critical'} class:flash-correct={flashState === 'correct'} class:flash-wrong={flashState === 'wrong'} class="message-slate">
 			<div class="message-slate__header">
 				<div>
-					<p class="label">Simulation</p>
+					<p class="label">Incoming message</p>
 					<h2>{mission.simulationType.replaceAll('_', ' ')}</h2>
 				</div>
 				<div class="message-meta">
 					<span>{mission.sender}</span>
-					<span>{mission.difficulty}</span>
+					<span>{mission.difficulty} mode</span>
 				</div>
 			</div>
 
@@ -547,6 +707,58 @@
 				<strong>{feedbackTitle}</strong>
 				<p>{feedbackBody}</p>
 			</div>
+
+			{#if missionState === 'ready' && !result}
+				<div
+					class:briefing-card--dragging={swipeDragging}
+					class="briefing-card"
+					role="button"
+					tabindex="0"
+					aria-label="Swipe right to start mission or swipe left to skip mission"
+					style={`transform: translateX(${swipeOffsetX}px) rotate(${swipeRotation}deg);`}
+					onpointerdown={handleBriefingPointerDown}
+					onpointermove={handleBriefingPointerMove}
+					onpointerup={handleBriefingPointerUp}
+					onpointercancel={handleBriefingPointerUp}
+					onkeydown={handleBriefingKeydown}
+				>
+					<div class="briefing-card__swipe-hint">
+						<span class:active={swipeDecision === 'skip'}>Skip</span>
+						<strong>Swipe</strong>
+						<span class:active={swipeDecision === 'start'}>Deploy</span>
+					</div>
+					<div class="briefing-card__header">
+						<div>
+							<p class="label">Mission briefing</p>
+							<h3>Protect the player from a {missionLabel} trap</h3>
+						</div>
+						<span>{mission.simulationType.replaceAll('_', ' ')}</span>
+					</div>
+					<div class="briefing-card__grid">
+						<article>
+							<span class="label">Threat source</span>
+							<strong>{mission.sender}</strong>
+						</article>
+						<article>
+							<span class="label">Red flags hidden</span>
+							<strong>{mission.clues.length}</strong>
+						</article>
+						<article>
+							<span class="label">Round stakes</span>
+							<strong>3 shields / 60s</strong>
+						</article>
+					</div>
+					<p class="briefing-card__tip">{mission.tip}</p>
+					<div class="briefing-card__actions">
+						<button type="button" class="ghost-button" onclick={() => browser && window.location.assign('/play')}>
+							Skip mission
+						</button>
+						<button type="button" class="primary-action briefing-card__action" onclick={beginMission}>
+							Start mission
+						</button>
+					</div>
+				</div>
+			{/if}
 
 			<div class:paused={paused || missionState !== 'active'} class="message-card">
 				{#each segments as segment}
@@ -570,40 +782,40 @@
 
 		<aside class="intel-rail">
 			<section>
-				<p class="label">Mission brief</p>
-				<h3>What to look for</h3>
+				<p class="label">Arcade coach</p>
+				<h3>What usually gives scams away</h3>
 				<ul>
-					<li>Look for urgency, authority, money pressure, and suspicious links.</li>
-					<li>Every correct tap locks in instantly and shows the explanation.</li>
-					<li>Three wrong taps end the mission with zero XP.</li>
+					<li>Watch for pressure words, fake authority, money requests, and strange links.</li>
+					<li>If you are unsure, pause and reread instead of tapping randomly.</li>
+					<li>Wrong taps hurt more than slow play.</li>
 				</ul>
 			</section>
 
 			<section>
-				<p class="label">Defensive tip</p>
-				<h3>Stay cold</h3>
+				<p class="label">Coach tip</p>
+				<h3>Best habit for this round</h3>
 				<p>{mission.tip}</p>
 			</section>
 
 			<section>
-				<p class="label">Clue board</p>
-				<h3>Known red flags</h3>
+				<p class="label">Target list</p>
+				<h3>Hidden red flags</h3>
 				<div class="clue-board">
 					{#each mission.clues as clue}
 						<article class:locked={foundIds.includes(clue.id)}>
 							<div>
-								<strong>{foundIds.includes(clue.id) ? 'Captured' : 'Hidden'}</strong>
+								<strong>{foundIds.includes(clue.id) ? 'Found' : 'Hidden'}</strong>
 								<span>{clue.difficulty}</span>
 							</div>
-							<p>{foundIds.includes(clue.id) ? clue.triggerText : 'Locate this clue inside the message.'}</p>
+							<p>{foundIds.includes(clue.id) ? clue.triggerText : 'Find this red flag somewhere in the message.'}</p>
 						</article>
 					{/each}
 				</div>
 			</section>
 
 			<section>
-				<p class="label">Progress sync</p>
-				<h3>{saveState === 'saved' ? 'Run logged' : saveState === 'saving' ? 'Syncing' : 'Local profile'}</h3>
+				<p class="label">Run sync</p>
+				<h3>{saveState === 'saved' ? 'Round saved' : saveState === 'saving' ? 'Saving progress' : 'Progress tracker'}</h3>
 				<p>{saveMessage}</p>
 				{#if profileSnapshot}
 					<div class="sync-metrics">
@@ -626,16 +838,17 @@
 		>
 			<div class="result-screen__hero">
 				<div>
-					<p class="label">Mission result</p>
+					<p class="label">Round result</p>
 					<h2>
 						{#if result.outcome === 'success'}
-							Threat contained
+							Scam stopped
 						{:else if result.outcome === 'failed'}
-							Threat breached
+							Shields broken
 						{:else}
-							Window missed
+							Time ran out
 						{/if}
 					</h2>
+					<p class="result-grade">{resultGrade}</p>
 				</div>
 				<strong>{result.xpEarned} XP</strong>
 			</div>
@@ -644,17 +857,22 @@
 				<article>
 					<span class="label">Found / missed</span>
 					<h3>{result.foundCount} / {result.missedCount}</h3>
-					<p>Every hidden clue is surfaced below so the mission still teaches even on failure.</p>
+					<p>You still get the full lesson below, even if the round went badly.</p>
 				</article>
 				<article>
-					<span class="label">XP breakdown</span>
+					<span class="label">Score breakdown</span>
 					<h3>{result.baseXP} + {result.speedBonus}</h3>
 					<p>Perfect x{result.perfectMultiplier}, streak x{result.streakMultiplier.toFixed(1)}</p>
 				</article>
 				<article>
-					<span class="label">Remaining shields</span>
+					<span class="label">Best combo</span>
+					<h3>x{Math.max(bestCombo, 1)}</h3>
+					<p>Longest chain of correct taps this round.</p>
+				</article>
+				<article>
+					<span class="label">Shields left</span>
 					<h3>{result.livesRemaining}</h3>
-					<p>{result.wrongTaps} wrong tap{result.wrongTaps === 1 ? '' : 's'} logged in this run.</p>
+					<p>{result.wrongTaps} wrong tap{result.wrongTaps === 1 ? '' : 's'} in this round.</p>
 				</article>
 			</div>
 
@@ -693,7 +911,7 @@
 						</div>
 						<p class="ai-feedback-card__text">{aiFeedback.feedbackText}</p>
 						<div class="ai-feedback-card__tip">
-							<strong>Real-life tip</strong>
+							<strong>Use this next time</strong>
 							<p>{aiFeedback.actionableTip}</p>
 						</div>
 						<p class="ai-feedback-card__encouragement">{aiFeedback.encouragement}</p>
@@ -711,14 +929,14 @@
 			<!-- Rank-up + Badge Awards -->
 			{#if rankUp}
 				<div class="rank-up-banner">
-					<span class="label">Rank up</span>
+					<span class="label">Level up</span>
 					<h3>{rankUp.from} → {rankUp.to}</h3>
 				</div>
 			{/if}
 
 			{#if newBadges.length > 0}
 				<div class="badges-earned">
-					<span class="label">Badges earned</span>
+					<span class="label">Rewards unlocked</span>
 					<div class="badges-grid">
 						{#each newBadges as badge, i}
 							<article class="badge-card" style="animation-delay: {i * 120}ms">
@@ -732,8 +950,8 @@
 			{/if}
 
 			<div class="result-actions">
-				<button type="button" class="primary-action" onclick={restartMission}>Replay mission</button>
-				<a class="ghost-link" href="/play">Load fresh mission</a>
+				<button type="button" class="primary-action" onclick={restartMission}>Play again</button>
+				<a class="ghost-link" href="/play">New round</a>
 				<button type="button" class="ghost-button" class:share-loading={isGeneratingLink} onclick={generateChallengeLink}>
 					{shareLinkText}
 				</button>
@@ -744,7 +962,6 @@
 
 <style>
 	.gameplay-shell {
-		--bg: #07111a;
 		--panel: rgba(8, 15, 24, 0.88);
 		--panel-strong: rgba(11, 20, 32, 0.94);
 		--line: rgba(138, 190, 214, 0.18);
@@ -778,10 +995,12 @@
 	.result-grid article,
 	.result-clues article {
 		border: 1px solid var(--line);
+		border-radius: 1rem;
 		background:
 			radial-gradient(circle at top right, rgba(125, 242, 201, 0.08), transparent 22%),
 			linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01)),
 			var(--panel);
+		box-shadow: 0 22px 60px rgba(0, 0, 0, 0.26);
 	}
 
 	.mission-strip,
@@ -789,6 +1008,64 @@
 	.intel-rail section,
 	.result-screen {
 		padding: 1.2rem;
+	}
+
+	.tutorial-strip {
+		display: grid;
+		grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+		gap: 1rem;
+		padding: 1rem 1.2rem;
+		border: 1px solid rgba(245, 196, 108, 0.22);
+		background:
+			radial-gradient(circle at top left, rgba(245, 196, 108, 0.12), transparent 30%),
+			linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01)),
+			var(--panel);
+	}
+
+	.tutorial-strip__hero h2 {
+		margin: 0.35rem 0 0.45rem;
+		font-family: var(--font-display, 'Cormorant Garamond', serif);
+		font-size: clamp(2rem, 5vw, 3rem);
+		font-weight: 600;
+		line-height: 0.94;
+	}
+
+	.tutorial-strip__hero p:last-child {
+		margin: 0;
+		color: var(--muted);
+		line-height: 1.6;
+	}
+
+	.tutorial-strip__steps {
+		display: grid;
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+		gap: 0.75rem;
+	}
+
+	.tutorial-strip__steps article {
+		padding: 0.95rem;
+		border: 1px solid rgba(255, 255, 255, 0.08);
+		background: rgba(255, 255, 255, 0.04);
+	}
+
+	.tutorial-strip__steps span {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 2rem;
+		height: 2rem;
+		border-radius: 999px;
+		background: var(--mint);
+		color: #06271d;
+		font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+		font-size: 0.82rem;
+		font-weight: 700;
+	}
+
+	.tutorial-strip__steps p {
+		margin: 0.85rem 0 0;
+		color: var(--text);
+		line-height: 1.5;
 	}
 
 	.mission-strip {
@@ -845,6 +1122,10 @@
 		text-transform: uppercase;
 		text-decoration: none;
 		cursor: pointer;
+		transition:
+			transform 150ms ease,
+			border-color 150ms ease,
+			background-color 150ms ease;
 	}
 
 	.ghost-link,
@@ -855,14 +1136,25 @@
 
 	.primary-action {
 		border-color: transparent;
-		background: var(--mint);
+		background: linear-gradient(135deg, var(--amber), var(--mint));
 		color: #052018;
 	}
 
-	.status-grid,
+	.ghost-link:hover,
+	.ghost-button:hover,
+	.primary-action:hover {
+		transform: translateY(-1px);
+	}
+
+	.status-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+		gap: 0.85rem;
+	}
+
 	.result-grid {
 		display: grid;
-		grid-template-columns: repeat(4, minmax(0, 1fr));
+		grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
 		gap: 0.85rem;
 	}
 
@@ -964,6 +1256,117 @@
 		font-size: 1rem;
 	}
 
+	.briefing-card {
+		margin-top: 1rem;
+		padding: 1rem;
+		border: 1px solid rgba(255, 183, 77, 0.22);
+		border-radius: 1rem;
+		background:
+			radial-gradient(circle at top right, rgba(255, 183, 77, 0.08), transparent 22%),
+			rgba(255, 255, 255, 0.03);
+		touch-action: pan-y;
+		transition: transform 180ms ease;
+	}
+
+	.briefing-card--dragging {
+		transition: none;
+		cursor: grabbing;
+	}
+
+	.briefing-card__swipe-hint {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: 0.75rem;
+		margin-bottom: 0.9rem;
+		font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+		font-size: 0.66rem;
+		letter-spacing: 0.16em;
+		text-transform: uppercase;
+		color: var(--muted);
+	}
+
+	.briefing-card__swipe-hint span,
+	.briefing-card__swipe-hint strong {
+		padding: 0.35rem 0.55rem;
+		border: 1px solid rgba(255, 255, 255, 0.08);
+		background: rgba(255, 255, 255, 0.03);
+	}
+
+	.briefing-card__swipe-hint span.active {
+		border-color: rgba(255, 183, 77, 0.3);
+		background: rgba(255, 183, 77, 0.08);
+		color: var(--text);
+	}
+
+	.briefing-card__header,
+	.briefing-card__grid {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 0.9rem;
+		align-items: end;
+	}
+
+	.briefing-card__header h3 {
+		margin: 0.35rem 0 0;
+		font-family: var(--font-display);
+		font-size: clamp(1.8rem, 4vw, 2.6rem);
+		font-weight: 500;
+		line-height: 0.96;
+	}
+
+	.briefing-card__header > span,
+	.briefing-card__grid span {
+		font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+		font-size: 0.68rem;
+		letter-spacing: 0.16em;
+		text-transform: uppercase;
+		color: var(--muted);
+	}
+
+	.briefing-card__header > span {
+		justify-self: end;
+		padding: 0.45rem 0.7rem;
+		border: 1px solid rgba(255, 255, 255, 0.08);
+		background: rgba(255, 255, 255, 0.04);
+	}
+
+	.briefing-card__grid {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+		margin-top: 1rem;
+	}
+
+	.briefing-card__grid article {
+		padding: 0.85rem;
+		border: 1px solid rgba(255, 255, 255, 0.08);
+		background: rgba(255, 255, 255, 0.03);
+	}
+
+	.briefing-card__grid strong {
+		display: block;
+		margin-top: 0.45rem;
+		font-family: var(--font-display);
+		font-size: 1.45rem;
+		line-height: 1.05;
+	}
+
+	.briefing-card__tip {
+		margin: 1rem 0 0;
+		color: var(--text);
+		line-height: 1.7;
+	}
+
+	.briefing-card__action {
+		margin-top: 0;
+	}
+
+	.briefing-card__actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.8rem;
+		margin-top: 1rem;
+	}
+
 	.message-card {
 		margin-top: 1rem;
 		padding: 1.1rem;
@@ -972,6 +1375,8 @@
 		background: var(--panel-strong);
 		line-height: 1.9;
 		white-space: pre-wrap;
+		font-size: clamp(1.02rem, 1.1vw, 1.14rem);
+		box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
 	}
 
 	.message-card.paused {
@@ -1095,6 +1500,15 @@
 
 	.result-clues article.missed {
 		border-color: rgba(255, 111, 97, 0.24);
+	}
+
+	.result-grade {
+		margin: 0.45rem 0 0;
+		font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+		font-size: 0.72rem;
+		letter-spacing: 0.16em;
+		text-transform: uppercase;
+		color: var(--amber);
 	}
 
 	.result-actions {
@@ -1293,10 +1707,20 @@
 	}
 
 	@media (max-width: 1100px) {
+		.tutorial-strip,
 		.status-grid,
 		.result-grid,
 		.play-grid,
 		.result-clues {
+			grid-template-columns: 1fr;
+		}
+
+		.briefing-card__header,
+		.briefing-card__grid {
+			grid-template-columns: 1fr;
+		}
+
+		.tutorial-strip__steps {
 			grid-template-columns: 1fr;
 		}
 

@@ -15,7 +15,7 @@ Current project state:
 
 Important caveats:
 - Phase 1 accuracy signoff is still pending. The pipeline is built, but the `>85%` SRS accuracy target is not yet proven.
-- Phase 3 lives are not fully server-backed in the current repo. The DB schema exists, but the gameplay UI still uses local storage for active shield state/regeneration.
+- Phase 3 lives are now server-backed through `/api/lives`, but formal acceptance validation for gameplay latency is still pending.
 
 ## Done
 
@@ -167,7 +167,6 @@ Partial:
 Partial:
 - `mission_attempts`, `xp_transactions`, and `user_stats` are implemented.
 - Rank and streak updates exist in a lightweight form.
-- The repo includes `007_add_lives_to_user_stats.sql`, but the active gameplay flow still uses local-storage shield state.
 - Hard acceptance validation for response times like `within 100ms` is not yet measured.
 
 Relevant file showing current gap:
@@ -259,4 +258,3 @@ Relevant files:
 - `src/routes/duel/[code]/+page.server.ts`
 - `src/routes/duel/[code]/+page.svelte`
 - `src/lib/components/gameplay/GameplayEngine.svelte`
-

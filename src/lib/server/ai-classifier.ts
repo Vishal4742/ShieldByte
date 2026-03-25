@@ -461,7 +461,9 @@ async function classifyWithFallback(params: {
 				method: 'ai',
 				categoryHint: effectiveCategoryHint,
 				result: finalResult,
-				signalStrength: heuristicAnalysis.signalStrength
+				signalStrength: heuristicAnalysis.signalStrength,
+				scoreMargin: heuristicAnalysis.scoreMargin,
+				relevanceScore: effectiveRelevanceScore
 			}),
 			model: aiResponse.model,
 			mlCategory: mlPrediction?.category ?? null,

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Hero from '$lib/components/home/Hero.svelte';
+	import SwipeDeck from '$lib/components/home/SwipeDeck.svelte';
 	import TrainingDeck from '$lib/components/home/TrainingDeck.svelte';
 	import ThreatCard from '$lib/components/home/ThreatCard.svelte';
 	import type { PageData } from './$types';
@@ -8,16 +9,10 @@
 </script>
 
 <svelte:head>
-	<title>ShieldByte | Threat Training Console</title>
+	<title>ShieldByte | Scam Defense Arcade</title>
 	<meta
 		name="description"
-		content="ShieldByte helps people review scam cases and practice spotting fraud signals through a simple training console."
-	/>
-	<link rel="preconnect" href="https://fonts.googleapis.com" />
-	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
-	<link
-		href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
-		rel="stylesheet"
+		content="ShieldByte turns real scam cases into game-like practice rounds so new users can learn fast and keep playing."
 	/>
 </svelte:head>
 
@@ -26,33 +21,33 @@
 	<div class="shell__glow shell__glow--left"></div>
 	<div class="shell__glow shell__glow--right"></div>
 
-	<!-- Nav is now in +layout.svelte -->
-
 	<main>
 		<Hero articles={data.articles} />
 
 		<section class="start-strip">
 			<article>
-				<span>Step 1</span>
-				<p>Pick a case from the feed.</p>
+				<span>Choose dossier</span>
+				<p>Pick a mission from the queue and read the setup like a pre-round briefing.</p>
 			</article>
 			<article>
-				<span>Step 2</span>
-				<p>Read the fraud clues.</p>
+				<span>Read the board</span>
+				<p>Study the live signals, pressure cues, and scam pattern before you deploy.</p>
 			</article>
 			<article>
-				<span>Step 3</span>
-				<p>Practice in the mission board.</p>
+				<span>Clear the run</span>
+				<p>Enter Scam Hunt, protect your shields, and finish the round clean.</p>
 			</article>
 		</section>
+
+		<SwipeDeck articles={data.articles} />
 
 		<section class="feed-panel" id="feed">
 			<div class="section-heading section-heading--row">
 				<div>
-					<p>Recent cases</p>
-					<h2>Threat feed</h2>
+					<p>Mission archive</p>
+					<h2>Playable dossier board</h2>
 				</div>
-				<span class="feed-panel__hint">Start with any case below.</span>
+				<span class="feed-panel__hint">Each dossier is a real scam pattern translated into a playable run. Start simple, then move into messy live cases.</span>
 			</div>
 
 			{#if data.articles.length > 0}
@@ -74,31 +69,7 @@
 </div>
 
 <style>
-	:global(html) {
-		scroll-behavior: smooth;
-	}
-
-	:global(body) {
-		margin: 0;
-		background:
-			radial-gradient(circle at top left, rgba(242, 171, 90, 0.13), transparent 22%),
-			radial-gradient(circle at 80% 12%, rgba(126, 170, 255, 0.09), transparent 18%),
-			#04060b;
-		color: #f6f1e8;
-		font-family: 'Cormorant Garamond', serif;
-	}
-
 	.shell {
-		--font-display: 'Cormorant Garamond', serif;
-		--font-mono: 'IBM Plex Mono', monospace;
-		--surface-strong: #090d14;
-		--line-soft: rgba(255, 255, 255, 0.12);
-		--line-strong: rgba(255, 255, 255, 0.22);
-		--text-strong: rgba(250, 247, 241, 0.96);
-		--text-soft: rgba(235, 226, 212, 0.78);
-		--text-muted: rgba(235, 226, 212, 0.5);
-		--accent: #f2ab5a;
-		--accent-soft: #ffd79b;
 		position: relative;
 		min-height: 100vh;
 		overflow: clip;
@@ -161,8 +132,10 @@
 		padding: 1.2rem;
 		border: 1px solid var(--line-soft);
 		background:
+			radial-gradient(circle at top right, rgba(114, 255, 214, 0.07), transparent 24%),
 			linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01)),
-			rgba(8, 11, 18, 0.82);
+			var(--surface-1);
+		box-shadow: var(--shadow-arcade);
 	}
 
 	.start-strip {
@@ -174,14 +147,26 @@
 
 	.start-strip article {
 		padding: 1rem;
-		border: 1px solid rgba(255, 255, 255, 0.08);
-		background: rgba(255, 255, 255, 0.03);
+		border: 1px solid rgba(255, 255, 255, 0.1);
+		background: rgba(255, 255, 255, 0.04);
 	}
 
 	.start-strip p {
 		margin: 0.55rem 0 0;
 		color: var(--text-strong);
 		line-height: 1.6;
+	}
+
+	.start-strip article:first-child {
+		border-color: rgba(255, 183, 77, 0.24);
+	}
+
+	.start-strip article:nth-child(2) {
+		border-color: rgba(114, 255, 214, 0.2);
+	}
+
+	.start-strip article:nth-child(3) {
+		border-color: rgba(255, 103, 77, 0.18);
 	}
 
 	.feed-panel {

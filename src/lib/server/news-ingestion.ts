@@ -14,7 +14,7 @@ import {
 } from './constants.js';
 import { NEWSAPI_KEY } from '$env/static/private';
 import { crawlFraudNews } from './web-scraper.js';
-import { analyzeFraudSignals } from './fraud-signals.js';
+import { analyzeFraudSignals, assessFraudRelevance } from './fraud-signals.js';
 import type { FraudCategory } from './constants.js';
 
 /** Shape of an article before DB insertion */
@@ -34,6 +34,59 @@ function sanitizeText(value: string | null | undefined): string {
 	return (value ?? '').trim().replace(/\s+/g, ' ');
 }
 
+const INGESTION_NEGATIVE_PATTERNS = [
+	'fraud prevention',
+	'prevent fraud',
+	'warning for',
+	'warn consumers',
+	'advisory',
+	'explainer',
+	'privacy policy',
+	'high court',
+	'consumer court',
+	'denies bail',
+	'police',
+	'cbi',
+	'mule account',
+	'mule accounts',
+	'need advice',
+	'questions about',
+	'how can i',
+	'is it legit',
+	'warranty issue',
+	'to launch in india',
+	'smartphone',
+	'rolls out',
+	'partnership'
+];
+
+const INGESTION_POSITIVE_PATTERNS = [
+	'collect request',
+	'request money',
+	'payment request',
+	'qr code',
+	'upi id',
+	'kyc update',
+	'account blocked',
+	'account freeze',
+	'you have won',
+	'lucky draw',
+	'telegram task',
+	'registration fee',
+	'joining fee',
+	'guaranteed return',
+	'daily profits',
+	'remote access',
+	'install anydesk',
+	'install teamviewer',
+	'fake payment screenshots',
+	'shared otp'
+];
+
+function countPatternHits(text: string, patterns: string[]) {
+	return patterns.reduce((count, pattern) => count + (text.includes(pattern) ? 1 : 0), 0);
+}
+
 function enrichArticle(
 	article: RawArticle,
 	sourceType: RawArticle['source_type']
@@ -41,8 +94,18 @@ function enrichArticle(
 	const title = sanitizeText(article.title);
 	const body = sanitizeText(article.body);
 	const analysis = analyzeFraudSignals(title, body);
+	const combinedText = `${title} ${body}`.toLowerCase();
+	const relevance = assessFraudRelevance(title, body, analysis);
+	const negativeHits = countPatternHits(combinedText, INGESTION_NEGATIVE_PATTERNS);
+	const positiveHits = countPatternHits(combinedText, INGESTION_POSITIVE_PATTERNS);
 
-	if (!title || !article.url || !analysis.isFraudLike) {
+	if (
+		!title ||
+		!article.url ||
+		!analysis.isFraudLike ||
+		!relevance.isRelevant ||
+		(negativeHits >= 2 && positiveHits === 0)
+	) {
 		return null;
 	}
 

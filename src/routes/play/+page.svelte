@@ -6,32 +6,34 @@
 </script>
 
 <svelte:head>
-	<title>ShieldByte | Live Mission</title>
+	<title>ShieldByte | Scam Hunt</title>
 	<meta
 		name="description"
-		content="Play a live ShieldByte mission with a timer, shield lives, tap detection, and result breakdown."
-	/>
-	<link rel="preconnect" href="https://fonts.googleapis.com" />
-	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
-	<link
-		href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
-		rel="stylesheet"
+		content="Play a live ShieldByte round with shields, timer pressure, clue tapping, and arcade-style scam defense feedback."
 	/>
 </svelte:head>
 
 <div class="play-shell">
 	<div class="play-shell__glow play-shell__glow--mint"></div>
 	<div class="play-shell__glow play-shell__glow--ember"></div>
+	<div class="play-shell__grid"></div>
 
 	<header class="play-head">
 		<div>
-			<p>ShieldByte Academy</p>
+			<p>{data.selectionMode === 'swipe_deck' ? 'Swipe-selected mission' : 'Arcade mission room'}</p>
 			<h1>Scam Hunt</h1>
 		</div>
-		<nav>
-			<a href="/">Home</a>
-			<a href="/#feed">Practice Cases</a>
-		</nav>
+		<div class="play-head__meta">
+			{#if data.selectionMode === 'swipe_deck'}
+				<span>direct deploy</span>
+			{/if}
+			{#if data.requestedFraudType}
+				<span>{data.requestedFraudType.replaceAll('_', ' ')}</span>
+			{/if}
+			<span>60s round</span>
+			<span>3 shields</span>
+			<span>live clue taps</span>
+		</div>
 	</header>
 
 	<main>
@@ -51,22 +53,22 @@
 </div>
 
 <style>
-	:global(body) {
-		margin: 0;
-		background:
-			radial-gradient(circle at top left, rgba(125, 242, 201, 0.08), transparent 22%),
-			radial-gradient(circle at 82% 12%, rgba(255, 111, 97, 0.08), transparent 20%),
-			#040a10;
-		color: #f2eee7;
-		font-family: 'Cormorant Garamond', serif;
-	}
-
 	.play-shell {
-		--font-display: 'Cormorant Garamond', serif;
-		--font-mono: 'IBM Plex Mono', monospace;
 		position: relative;
 		min-height: 100vh;
 		overflow: clip;
+	}
+
+	.play-shell__grid {
+		position: fixed;
+		inset: 0;
+		pointer-events: none;
+		opacity: 0.12;
+		background-image:
+			linear-gradient(rgba(114, 255, 214, 0.12) 1px, transparent 1px),
+			linear-gradient(90deg, rgba(114, 255, 214, 0.08) 1px, transparent 1px);
+		background-size: 88px 88px;
+		mask-image: radial-gradient(circle at center, black, transparent 88%);
 	}
 
 	.play-shell__glow {
@@ -101,12 +103,12 @@
 		align-items: end;
 		padding: 1rem clamp(1.2rem, 4vw, 3rem);
 		backdrop-filter: blur(18px);
-		background: rgba(4, 10, 16, 0.72);
-		border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+		background: rgba(6, 12, 22, 0.72);
+		border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 	}
 
 	.play-head p,
-	.play-head nav a,
+	.play-head__meta span,
 	.eyebrow {
 		font-family: var(--font-mono);
 		font-size: 0.72rem;
@@ -123,16 +125,18 @@
 		line-height: 0.95;
 	}
 
-	.play-head nav {
+	.play-head__meta {
 		display: flex;
 		flex-wrap: wrap;
-		gap: 1rem;
+		gap: 0.6rem;
 	}
 
-	.play-head nav a,
-	.empty-state a {
-		color: #f2eee7;
-		text-decoration: none;
+	.play-head__meta span {
+		padding: 0.5rem 0.7rem;
+		border: 1px solid rgba(255, 255, 255, 0.08);
+		border-radius: 999px;
+		background: rgba(255, 255, 255, 0.04);
+		color: var(--text-soft);
 	}
 
 	main {
@@ -144,10 +148,12 @@
 	.empty-state {
 		max-width: 44rem;
 		padding: 1.4rem;
-		border: 1px solid rgba(255, 255, 255, 0.12);
+		border: 1px solid var(--line-soft);
 		background:
+			radial-gradient(circle at top right, rgba(255, 183, 77, 0.08), transparent 26%),
 			linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01)),
-			rgba(8, 15, 24, 0.86);
+			var(--surface-2);
+		box-shadow: var(--shadow-arcade);
 	}
 
 	.empty-state h2 {
@@ -159,7 +165,7 @@
 	}
 
 	.empty-state p:last-of-type {
-		color: rgba(242, 238, 231, 0.72);
+		color: var(--text-soft);
 		line-height: 1.7;
 	}
 
@@ -168,6 +174,8 @@
 		margin-top: 1rem;
 		padding: 0.85rem 1rem;
 		border: 1px solid rgba(255, 255, 255, 0.12);
+		color: var(--text-strong);
+		text-decoration: none;
 	}
 
 	@media (max-width: 720px) {

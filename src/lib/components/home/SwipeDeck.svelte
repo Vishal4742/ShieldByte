@@ -286,7 +286,7 @@
 	.mission-queue__intro {
 		max-width: 32rem;
 		margin: 0.85rem 0 0;
-		color: var(--text-soft);
+		color: rgba(10, 10, 10, 0.82);
 		line-height: 1.7;
 		font-size: 0.98rem;
 	}
@@ -418,7 +418,7 @@
 
 	.mission-card p {
 		margin: 0;
-		color: var(--text-soft);
+		color: rgba(10, 10, 10, 0.82);
 		line-height: 1.7;
 		display: -webkit-box;
 		line-clamp: 4;

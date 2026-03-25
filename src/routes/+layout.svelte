@@ -53,9 +53,12 @@
 		--line-soft: rgba(255, 255, 255, 0.15);
 		--line-strong: rgba(255, 255, 255, 0.4);
 		--panel-border: rgba(255, 255, 255, 0.15);
-		--text-strong: rgba(255, 255, 255, 0.9);
-		--text-soft: rgba(255, 255, 255, 0.5);
-		--text-muted: rgba(255, 255, 255, 0.3);
+		--text-strong: #162632;
+		--text-soft: rgba(22, 38, 50, 0.8);
+		--text-muted: rgba(22, 38, 50, 0.58);
+		--text-inverse-strong: rgba(255, 255, 255, 0.92);
+		--text-inverse-soft: rgba(255, 255, 255, 0.68);
+		--text-inverse-muted: rgba(255, 255, 255, 0.46);
 		--accent-gold: #eda167;
 		--accent-mint: rgba(255, 255, 255, 0.9);
 		--accent-cyan: rgba(255, 255, 255, 0.9);
@@ -120,7 +123,7 @@
 		align-items: center;
 		gap: 0.75rem;
 		text-decoration: none;
-		color: var(--text-strong);
+		color: var(--text-inverse-strong);
 	}
 
 	.global-nav__logo {
@@ -133,7 +136,7 @@
 		font-family: var(--font-mono);
 		font-weight: 300;
 		letter-spacing: 0.12em;
-		color: var(--text-strong);
+		color: var(--text-inverse-strong);
 		background: transparent;
 		border: 1px solid var(--panel-border);
 		line-height: 1;
@@ -147,7 +150,7 @@
 		font-weight: 400;
 		letter-spacing: 0.1em;
 		text-transform: lowercase;
-		color: var(--text-strong);
+		color: var(--text-inverse-strong);
 	}
 
 	.global-nav__tag {
@@ -157,7 +160,7 @@
 		font-size: 0.58rem;
 		letter-spacing: 0.14em;
 		text-transform: uppercase;
-		color: var(--text-soft);
+		color: var(--text-inverse-soft);
 	}
 
 	.global-nav__links {
@@ -173,7 +176,7 @@
 		letter-spacing: 0.1em;
 		text-transform: uppercase;
 		text-decoration: none;
-		color: var(--text-strong);
+		color: var(--text-inverse-strong);
 		padding: 0 0 0.25rem;
 		border-radius: 0;
 		border: none;
@@ -191,13 +194,13 @@
 		bottom: 0;
 		width: 0;
 		height: 1px;
-		background: var(--text-strong);
+		background: var(--text-inverse-strong);
 		transition: width 0.35s ease;
 	}
 
 	.global-nav__link:hover {
 		transform: none;
-		color: var(--text-strong);
+		color: var(--text-inverse-strong);
 	}
 
 	.global-nav__link:hover::after {
@@ -216,7 +219,7 @@
 		font-size: 0.58rem;
 		letter-spacing: 0.1em;
 		text-transform: uppercase;
-		color: var(--text-soft);
+		color: var(--text-inverse-soft);
 	}
 
 	.global-nav__dot {

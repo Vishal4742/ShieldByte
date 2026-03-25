@@ -215,7 +215,7 @@
 		margin: 0;
 		font-size: 1.02rem;
 		line-height: 1.8;
-		color: var(--text-soft);
+		color: rgba(10, 10, 10, 0.82);
 	}
 
 	.hero__actions {
@@ -290,7 +290,7 @@
 	.hero__loop p {
 		margin: 0.8rem 0 0;
 		line-height: 1.6;
-		color: var(--text-soft);
+		color: rgba(10, 10, 10, 0.82);
 	}
 
 	.preview-card {

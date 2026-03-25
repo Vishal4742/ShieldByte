@@ -166,7 +166,7 @@
 
 	.threat-card__body p {
 		margin: 0.8rem 0 0;
-		color: var(--text-soft);
+		color: rgba(10, 10, 10, 0.82);
 		line-height: 1.75;
 	}
 

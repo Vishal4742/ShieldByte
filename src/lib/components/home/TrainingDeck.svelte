@@ -516,4 +516,67 @@
 			min-width: 0;
 		}
 	}
+
+	@media (max-width: 720px) {
+		.training-app {
+			gap: 1rem;
+			margin-top: 1.4rem;
+		}
+
+		.training-app__eyebrow,
+		.training-app__stats span,
+		.slate-heading p,
+		.signal-pill-row span,
+		.message-window header span,
+		.intel-strip span,
+		.progress-module span,
+		.evaluation-board span,
+		.training-empty {
+			font-size: 0.62rem;
+			letter-spacing: 0.14em;
+		}
+
+		.training-app__header h2,
+		.slate-heading h3 {
+			font-size: clamp(1.95rem, 8vw, 2.8rem);
+		}
+
+		.training-app__stats article,
+		.training-empty,
+		.training-slate {
+			padding: 1rem;
+			border-radius: 1rem;
+		}
+
+		.training-slate::before {
+			inset: 0.6rem;
+		}
+
+		.message-window__body {
+			max-height: 18rem;
+			padding: 0.85rem;
+		}
+
+		.signal-grid button,
+		.intel-strip div,
+		.progress-module,
+		.evaluation-board__grid article {
+			padding: 0.85rem;
+		}
+
+		.action-primary,
+		.action-secondary {
+			width: 100%;
+		}
+	}
+
+	@media (max-width: 480px) {
+		.training-app__stats strong {
+			font-size: 1.7rem;
+		}
+
+		.signal-grid span {
+			font-size: 1rem;
+		}
+	}
 </style>

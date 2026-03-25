@@ -20,7 +20,7 @@
 
 	<header class="play-head">
 		<div>
-			<p>{data.selectionMode === 'swipe_deck' ? 'Swipe-selected mission' : 'Arcade mission room'}</p>
+			<p>{data.selectionMode === 'swipe_deck' ? 'Case selected from mission board' : 'Scam judgment round'}</p>
 			<h1>Scam Hunt</h1>
 		</div>
 		<div class="play-head__meta">
@@ -30,9 +30,9 @@
 			{#if data.requestedFraudType}
 				<span>{data.requestedFraudType.replaceAll('_', ' ')}</span>
 			{/if}
-			<span>60s round</span>
+			<span>60 second round</span>
 			<span>3 shields</span>
-			<span>live clue taps</span>
+			<span>spot the scam</span>
 		</div>
 	</header>
 
@@ -63,33 +63,32 @@
 		position: fixed;
 		inset: 0;
 		pointer-events: none;
-		opacity: 0.12;
+		opacity: 0.08;
 		background-image:
 			linear-gradient(rgba(114, 255, 214, 0.12) 1px, transparent 1px),
 			linear-gradient(90deg, rgba(114, 255, 214, 0.08) 1px, transparent 1px);
 		background-size: 88px 88px;
-		mask-image: radial-gradient(circle at center, black, transparent 88%);
 	}
 
 	.play-shell__glow {
 		position: fixed;
-		width: 28rem;
-		height: 28rem;
+		width: 18rem;
+		height: 18rem;
 		border-radius: 999px;
-		filter: blur(100px);
+		filter: blur(120px);
 		pointer-events: none;
-		opacity: 0.15;
+		opacity: 0.08;
 	}
 
 	.play-shell__glow--mint {
-		top: -10rem;
-		left: -8rem;
+		top: -12rem;
+		left: -10rem;
 		background: #7df2c9;
 	}
 
 	.play-shell__glow--ember {
-		right: -10rem;
-		top: 4rem;
+		right: -12rem;
+		top: 2rem;
 		background: #ff6f61;
 	}
 
@@ -101,10 +100,10 @@
 		justify-content: space-between;
 		gap: 1rem;
 		align-items: end;
-		padding: 1rem clamp(1.2rem, 4vw, 3rem);
+		padding: 1rem clamp(1.2rem, 4vw, 3rem) 0.9rem;
 		backdrop-filter: blur(18px);
-		background: rgba(6, 12, 22, 0.72);
-		border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+		background: linear-gradient(180deg, rgba(7, 14, 24, 0.9), rgba(7, 14, 24, 0.58));
+		border-bottom: 1px solid rgba(130, 191, 255, 0.08);
 	}
 
 	.play-head p,
@@ -120,9 +119,9 @@
 	.play-head h1 {
 		margin: 0.35rem 0 0;
 		font-family: var(--font-display);
-		font-size: clamp(2rem, 5vw, 3.8rem);
-		font-weight: 500;
-		line-height: 0.95;
+		font-size: clamp(2.15rem, 5vw, 3.6rem);
+		font-weight: 600;
+		line-height: 0.98;
 	}
 
 	.play-head__meta {
@@ -133,35 +132,36 @@
 
 	.play-head__meta span {
 		padding: 0.5rem 0.7rem;
-		border: 1px solid rgba(255, 255, 255, 0.08);
+		border: 1px solid rgba(130, 191, 255, 0.1);
 		border-radius: 999px;
-		background: rgba(255, 255, 255, 0.04);
+		background: rgba(255, 255, 255, 0.025);
 		color: var(--text-soft);
 	}
 
 	main {
 		position: relative;
 		z-index: 1;
-		padding: 1.25rem clamp(1.2rem, 4vw, 3rem) 3rem;
+		padding: 1rem clamp(1.2rem, 4vw, 3rem) 3rem;
 	}
 
 	.empty-state {
 		max-width: 44rem;
 		padding: 1.4rem;
-		border: 1px solid var(--line-soft);
+		border: 1px solid rgba(130, 191, 255, 0.12);
+		border-radius: 1.25rem;
 		background:
-			radial-gradient(circle at top right, rgba(255, 183, 77, 0.08), transparent 26%),
+			radial-gradient(circle at top right, rgba(66, 199, 255, 0.08), transparent 26%),
 			linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01)),
 			var(--surface-2);
-		box-shadow: var(--shadow-arcade);
+		box-shadow: var(--shadow-hud);
 	}
 
 	.empty-state h2 {
 		margin: 0.45rem 0 0;
 		font-family: var(--font-display);
 		font-size: clamp(2.1rem, 5vw, 3.8rem);
-		font-weight: 500;
-		line-height: 0.95;
+		font-weight: 600;
+		line-height: 0.98;
 	}
 
 	.empty-state p:last-of-type {
@@ -173,7 +173,8 @@
 		display: inline-flex;
 		margin-top: 1rem;
 		padding: 0.85rem 1rem;
-		border: 1px solid rgba(255, 255, 255, 0.12);
+		border: 1px solid rgba(130, 191, 255, 0.12);
+		border-radius: 999px;
 		color: var(--text-strong);
 		text-decoration: none;
 	}
@@ -182,6 +183,44 @@
 		.play-head {
 			flex-direction: column;
 			align-items: start;
+			padding: 0.85rem 0.9rem;
+		}
+
+		.play-head h1 {
+			font-size: clamp(1.85rem, 10vw, 2.8rem);
+		}
+
+		.play-head__meta {
+			width: 100%;
+			gap: 0.45rem;
+		}
+
+		.play-head__meta span {
+			padding: 0.45rem 0.6rem;
+			font-size: 0.62rem;
+			letter-spacing: 0.12em;
+		}
+
+		main {
+			padding: 0.9rem 0.9rem 2.5rem;
+		}
+
+		.empty-state {
+			padding: 1rem;
+			border-radius: 1rem;
+		}
+	}
+
+	@media (max-width: 480px) {
+		.play-head p,
+		.eyebrow {
+			font-size: 0.62rem;
+			letter-spacing: 0.12em;
+		}
+
+		.play-head__meta span {
+			width: calc(50% - 0.25rem);
+			box-sizing: border-box;
 		}
 	}
 </style>

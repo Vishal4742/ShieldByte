@@ -4,7 +4,6 @@ export const MISSION_DURATION_SECONDS = 60;
 export const LOW_TIME_THRESHOLD_SECONDS = 15;
 export const MAX_LIVES = 3;
 export const LIFE_REGEN_MS = 60 * 60 * 1000;
-export const LIVES_STORAGE_KEY = 'shieldbyte:lives-state';
 export const PLAYER_ID_STORAGE_KEY = 'shieldbyte:player-id';
 
 export interface MissionSegment {

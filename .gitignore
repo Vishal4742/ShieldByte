@@ -33,3 +33,8 @@ ShieldByte_SRS_v4.md
 
 # Local evaluation outputs
 tmp/
+
+# Test scripts and debug outputs
+test_*.js
+test_*.txt
+check-output.txt

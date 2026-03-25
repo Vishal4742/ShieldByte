@@ -1,34 +1,59 @@
 <script lang="ts">
+	import { browser } from '$app/environment';
 	import GameplayEngine from '$lib/components/gameplay/GameplayEngine.svelte';
+	import { PLAYER_ID_STORAGE_KEY, getOrCreatePlayerId } from '$lib/gameplay/engine.js';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
-	let code = $derived(data.code);
-	let mission = $derived(data.mission);
-	let referrerName = $derived(data.referrerName);
-	let recruitId = $derived(data.recruitId);
 
 	let challengeAccepted = $state(false);
+	let claimState = $state<'idle' | 'claiming' | 'done' | 'error'>('idle');
+	let claimMessage = $state('');
 
 	async function acceptChallenge() {
 		challengeAccepted = true;
-	}
-	
-	// When the mission finishes in GameplayEngine, we should ideally claim the referral.
-	// We'll intercept or just call the claim endpoint when they start.
-	// Since we don't have a rigid auth wall, let's claim it as soon as they accept if we have a recruitId,
-	// or fake it by sending a random id as guest to test the link mapping.
-	$effect(() => {
-		if (challengeAccepted) {
-			const guestId = recruitId || 'guest-' + Math.random().toString(36).substring(7);
-			fetch('/api/referrals/claim', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ code, recruit_user_id: guestId })
-			}).catch(e => console.error(e));
-		}
-	});
+		claimState = 'claiming';
 
+		if (!browser) {
+			return;
+		}
+
+		const playerId = getOrCreatePlayerId(localStorage.getItem(PLAYER_ID_STORAGE_KEY));
+		localStorage.setItem(PLAYER_ID_STORAGE_KEY, playerId);
+
+		try {
+			const tokenRes = await fetch('/api/user/token', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ user_id: playerId })
+			});
+
+			const tokenPayload = tokenRes.ok ? ((await tokenRes.json()) as { token: string }) : null;
+
+			await fetch('/api/referrals/claim', {
+				method: 'POST',
+				headers: {
+					'content-type': 'application/json',
+					...(tokenPayload?.token
+						? {
+								'x-player-id': playerId,
+								'x-player-token': tokenPayload.token
+							}
+						: {})
+				},
+				body: JSON.stringify({
+					code: data.code,
+					recruit_user_id: playerId
+				})
+			});
+
+			claimState = 'done';
+		} catch (error) {
+			console.error('[challenge] Failed to claim referral:', error);
+			claimState = 'error';
+			claimMessage = 'Challenge accepted. Referral reward could not be claimed automatically.';
+		}
+	}
 </script>
 
 <svelte:head>
@@ -37,49 +62,164 @@
 
 <div class="challenge-shell">
 	{#if !challengeAccepted}
-		<main class="landing-card bg-gray-900 border border-emerald-500/30 rounded-3xl p-8 max-w-xl mx-auto mt-20 text-center relative overflow-hidden">
-			<div class="absolute inset-0 bg-gradient-to-b from-emerald-500/10 to-transparent pointer-events-none"></div>
-			
-			<div class="w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
-				<span class="text-4xl">🎯</span>
-			</div>
+		<main class="challenge-main">
+			<section class="challenge-hero">
+				<p class="challenge-label">Friend challenge</p>
+				<h1>{data.referrerName} sent you a live scam round.</h1>
+				<p class="challenge-copy">
+					Play the same mission, beat the score, and prove you can spot the scam faster.
+				</p>
 
-			<h1 class="text-3xl font-bold text-white mb-2">You've Been Challenged!</h1>
-			<p class="text-emerald-400 font-semibold text-lg mb-6">{referrerName} thinks you have what it takes to beat this Cyber Threat Mission.</p>
-			
-			<div class="bg-gray-800 rounded-xl p-4 text-left border border-gray-700 mb-8 mt-4 mx-4 shadow-inner">
-				<p class="text-sm font-mono text-gray-500 uppercase tracking-widest mb-2">Mission Brief</p>
-				<p class="text-gray-300">Identify the hidden threat signals within this incoming message. Don't fall for the traps!</p>
-				<div class="mt-4 flex gap-4 text-sm font-mono text-cyan-400">
-					<span>Difficulty: {mission.difficulty}</span>
-					<span>•</span>
-					<span>Target: {mission.fraudType.replace('_', ' ')}</span>
+				<div class="challenge-meta">
+					<span>{data.mission.difficulty} difficulty</span>
+					<span>{data.mission.fraudType.replaceAll('_', ' ')}</span>
+					<span>head to head</span>
 				</div>
-			</div>
 
-			<button 
-				onclick={acceptChallenge}
-				class="bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-gray-900 px-8 py-4 rounded-xl font-bold text-xl transition-all hover:scale-105 shadow-[0_0_30px_rgba(16,185,129,0.3)] w-full block"
-			>
-				ACCEPT CHALLENGE
-			</button>
-			<p class="text-gray-500 text-sm mt-4">No sign-up required. Play instantly.</p>
+				<div class="challenge-brief">
+					<p class="challenge-label">Mission brief</p>
+					<h2>Read the message. Judge the threat. Lock the scam signals.</h2>
+					<p>
+						This round uses the same mission rules as the main game: one clock, limited shields,
+						and score pressure.
+					</p>
+				</div>
+
+				<button type="button" class="challenge-cta" onclick={acceptChallenge}>
+					Accept challenge
+				</button>
+			</section>
 		</main>
 	{:else}
-		<GameplayEngine mission={mission} streakDays={0} />
+		{#if claimState === 'error'}
+			<div class="challenge-banner">{claimMessage}</div>
+		{/if}
+
+		<GameplayEngine mission={data.mission} streakDays={0} />
 	{/if}
 </div>
 
 <style>
-	:global(body) {
-		margin: 0;
-		background: #040a10;
-		color: #f2eee7;
-		font-family: 'Cormorant Garamond', serif;
+	.challenge-shell {
+		padding: 1.25rem clamp(1rem, 4vw, 3rem) 3rem;
 	}
 
-	.challenge-shell {
-		position: relative;
-		min-height: 100vh;
+	.challenge-main {
+		max-width: 860px;
+		margin: 0 auto;
+	}
+
+	.challenge-hero,
+	.challenge-brief,
+	.challenge-banner {
+		border: 1px solid var(--panel-border);
+		border-radius: 1.25rem;
+		background:
+			radial-gradient(circle at top right, rgba(66, 199, 255, 0.1), transparent 24%),
+			linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01)),
+			var(--surface-1);
+		box-shadow: var(--shadow-hud);
+	}
+
+	.challenge-hero {
+		padding: 1.4rem;
+	}
+
+	.challenge-label,
+	.challenge-meta span {
+		font-family: var(--font-mono);
+		font-size: 0.7rem;
+		letter-spacing: 0.16em;
+		text-transform: uppercase;
+		color: var(--text-muted);
+	}
+
+	.challenge-hero h1,
+	.challenge-brief h2 {
+		margin: 0.45rem 0 0;
+		font-family: var(--font-display);
+		font-size: clamp(2.4rem, 6vw, 4.6rem);
+		font-weight: 700;
+		line-height: 0.94;
+	}
+
+	.challenge-copy,
+	.challenge-brief p,
+	.challenge-banner {
+		color: var(--text-soft);
+		line-height: 1.7;
+	}
+
+	.challenge-copy {
+		max-width: 40rem;
+		margin: 0.85rem 0 0;
+		font-size: 1.03rem;
+	}
+
+	.challenge-meta {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.6rem;
+		margin-top: 1rem;
+	}
+
+	.challenge-meta span {
+		padding: 0.45rem 0.7rem;
+		border: 1px solid rgba(130, 191, 255, 0.12);
+		border-radius: 999px;
+		background: rgba(255, 255, 255, 0.03);
+		color: var(--text-soft);
+	}
+
+	.challenge-brief {
+		margin-top: 1.2rem;
+		padding: 1.1rem;
+	}
+
+	.challenge-cta {
+		margin-top: 1.2rem;
+		min-height: 3.2rem;
+		padding: 0 1.3rem;
+		border: none;
+		border-radius: 0.95rem;
+		background: linear-gradient(135deg, var(--accent-cyan), var(--accent-mint));
+		color: #07131f;
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		font-weight: 600;
+		letter-spacing: 0.16em;
+		text-transform: uppercase;
+		cursor: pointer;
+	}
+
+	.challenge-banner {
+		max-width: 860px;
+		margin: 0 auto 1rem;
+		padding: 0.9rem 1rem;
+	}
+
+	@media (max-width: 720px) {
+		.challenge-shell {
+			padding: 1rem 0.9rem 2.5rem;
+		}
+
+		.challenge-hero,
+		.challenge-brief {
+			padding: 1rem;
+			border-radius: 1rem;
+		}
+
+		.challenge-hero h1,
+		.challenge-brief h2 {
+			font-size: clamp(2rem, 9vw, 3rem);
+		}
+
+		.challenge-copy {
+			font-size: 0.96rem;
+		}
+
+		.challenge-cta {
+			width: 100%;
+		}
 	}
 </style>

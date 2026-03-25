@@ -1,4 +1,5 @@
 import type { ThreatMission, MissionClue } from '$lib/types/mission.js';
+import type { ThreatArticle } from '$lib/types/threat.js';
 import { supabase } from './supabase.js';
 
 interface MissionRow {
@@ -154,4 +155,43 @@ export async function fetchMissionById(id: number): Promise<ThreatMission | null
 	}
 
 	return normalizeMission(data as MissionRow);
+}
+
+function buildFallbackMessageBody(article: ThreatArticle): string {
+	const segments = [
+		`Source: ${article.source}`,
+		`Channel: ${article.channel}`,
+		'',
+		article.scenarioSummary,
+		'',
+		article.body
+	]
+		.map((segment) => segment.trim())
+		.filter((segment) => segment.length > 0);
+
+	const combined = segments.join('\n\n');
+	return combined.length > 1400 ? `${combined.slice(0, 1397)}...` : combined;
+}
+
+export function buildFallbackMissionFromArticle(article: ThreatArticle): ThreatMission {
+	const clues: MissionClue[] = article.clues.map((clue, index) => ({
+		id: index + 1,
+		triggerText: clue.clueText,
+		type: clue.type,
+		difficulty: 'medium',
+		explanation: clue.explanation
+	}));
+
+	return {
+		id: article.id,
+		articleId: article.id,
+		fraudType: article.category,
+		simulationType: 'message',
+		sender: article.source,
+		messageBody: buildFallbackMessageBody(article),
+		difficulty: 'medium',
+		tip: article.tip,
+		variant: 1,
+		clues
+	};
 }

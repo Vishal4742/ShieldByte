@@ -7,29 +7,26 @@
 	let profile = $derived(data.profile);
 	let userId = $derived(data.userId);
 
-	// Badge emoji mapping
 	const badgeEmoji: Record<string, string> = {
-		speed_demon: '⚡',
-		sharpshooter: '🎯',
-		upi_guardian: '🛡️',
-		kyc_defender: '🔒',
-		viral_protector: '📢',
-		week_warrior: '🔥',
-		perfect_week: '💎',
-		mentor: '🎓',
-		fraud_hunter: '🏆'
+		speed_demon: '[SPD]',
+		sharpshooter: '[AIM]',
+		upi_guardian: '[UPI]',
+		kyc_defender: '[KYC]',
+		viral_protector: '[SOC]',
+		week_warrior: '[7D]',
+		perfect_week: '[MAX]',
+		mentor: '[EDU]',
+		fraud_hunter: '[TOP]'
 	};
 
-	// Rank colors
 	const rankColors: Record<string, string> = {
-		'Rookie': '#94a3b8',
+		Rookie: '#94a3b8',
 		'Alert Analyst': '#60a5fa',
 		'Threat Specialist': '#a78bfa',
 		'Cyber Commander': '#f59e0b',
 		'Shield Master': '#7df2c9'
 	};
 
-	// If no userId, try to load from localStorage
 	$effect(() => {
 		if (browser && !userId) {
 			const storedId = localStorage.getItem('shieldbyte:player-id');
@@ -51,7 +48,7 @@
 	function outcomeLabel(outcome: string): string {
 		if (outcome === 'success') return 'Cleared';
 		if (outcome === 'failed') return 'Breached';
-		return 'Timed Out';
+		return 'Timed out';
 	}
 
 	function outcomeClass(outcome: string): string {
@@ -62,70 +59,77 @@
 </script>
 
 <svelte:head>
-	<title>ShieldByte | Agent Profile</title>
+	<title>ShieldByte | Profile</title>
 </svelte:head>
 
 <div class="profile-shell">
 	<div class="profile-shell__grain"></div>
 
 	<main class="profile-main">
-		<!-- ─── Hero Stats Section ─── -->
-		<section class="hero-stats">
-			<div class="hero-stats__rank-card">
-				<p class="mono-label">Current Rank</p>
-				<h1 class="hero-stats__rank" style="color: {rankColors[profile.stats.rank] ?? '#7df2c9'}">
-					{profile.stats.rank}
-				</h1>
-				<div class="hero-stats__xp-bar">
-					<div class="hero-stats__xp-fill" style="width: {Math.min((profile.stats.total_xp % 2000) / 20, 100)}%"></div>
-				</div>
-				<p class="hero-stats__xp-label">{profile.stats.total_xp} XP total</p>
+		<section class="profile-hero">
+			<div class="profile-hero__identity">
+				<p class="mono-label">Operator profile</p>
+				<h1>Progress, rank, and mission history.</h1>
+				<p class="profile-hero__copy">
+					Track how many scam rounds you cleared, which badges you unlocked, and how your judgment is improving over time.
+				</p>
 			</div>
 
-			<div class="stats-grid">
-				<article class="stat-card">
-					<span class="mono-label">Missions</span>
-					<strong>{profile.stats.missions_completed ?? 0}</strong>
-					<p>completed</p>
-				</article>
-				<article class="stat-card">
-					<span class="mono-label">Streak</span>
-					<strong>{profile.stats.streak_days ?? 0}</strong>
-					<p>day{(profile.stats.streak_days ?? 0) === 1 ? '' : 's'}</p>
-				</article>
-				<article class="stat-card stat-card--accent">
-					<span class="mono-label">Badges</span>
-					<strong>{profile.badges.filter((b: { earned: boolean }) => b.earned).length}/{profile.badges.length}</strong>
-					<p>earned</p>
-				</article>
-				<article class="stat-card">
-					<span class="mono-label">Last active</span>
-					<strong class="stat-card__date">{formatDate(profile.stats.last_mission_date)}</strong>
-					<p>last mission</p>
-				</article>
+			<div class="profile-rank-card">
+				<p class="mono-label">Current rank</p>
+				<h2 style="color: {rankColors[profile.stats.rank] ?? '#7df2c9'}">{profile.stats.rank}</h2>
+				<div class="profile-rank-card__bar">
+					<div
+						class="profile-rank-card__fill"
+						style="width: {Math.min((profile.stats.total_xp % 2000) / 20, 100)}%"
+					></div>
+				</div>
+				<p class="profile-rank-card__meta">{profile.stats.total_xp} XP total</p>
 			</div>
 		</section>
 
-		<!-- ─── Badges Gallery ─── -->
-		<section class="badges-section">
+		<section class="stats-strip">
+			<article>
+				<span class="mono-label">Missions</span>
+				<strong>{profile.stats.missions_completed ?? 0}</strong>
+				<p>completed</p>
+			</article>
+			<article>
+				<span class="mono-label">Streak</span>
+				<strong>{profile.stats.streak_days ?? 0}</strong>
+				<p>day{(profile.stats.streak_days ?? 0) === 1 ? '' : 's'}</p>
+			</article>
+			<article>
+				<span class="mono-label">Badges</span>
+				<strong>{profile.badges.filter((b: { earned: boolean }) => b.earned).length}/{profile.badges.length}</strong>
+				<p>earned</p>
+			</article>
+			<article>
+				<span class="mono-label">Last active</span>
+				<strong>{formatDate(profile.stats.last_mission_date)}</strong>
+				<p>latest mission</p>
+			</article>
+		</section>
+
+		<section class="page-section">
 			<div class="section-header">
-				<p class="mono-label">Achievement vault</p>
-				<h2>Badges</h2>
+				<div>
+					<p class="mono-label">Achievement vault</p>
+					<h2>Badge cabinet</h2>
+				</div>
 			</div>
 
 			<div class="badges-gallery">
 				{#each profile.badges as badge}
-					<article class="badge-tile" class:badge-tile--earned={badge.earned} class:badge-tile--locked={!badge.earned}>
-						<div class="badge-tile__icon">
-							{badgeEmoji[badge.id] ?? '🏅'}
-						</div>
+					<article class:badge-tile--earned={badge.earned} class="badge-tile">
+						<div class="badge-tile__icon">{badgeEmoji[badge.id] ?? '[BADGE]'}</div>
 						<div class="badge-tile__info">
 							<h3>{badge.name}</h3>
 							<p>{badge.description}</p>
 							{#if badge.earned && badge.earnedAt}
-								<span class="badge-tile__date">Earned {formatDate(badge.earnedAt)}</span>
+								<span class="badge-tile__meta">Earned {formatDate(badge.earnedAt)}</span>
 							{:else}
-								<span class="badge-tile__locked-label">Locked</span>
+								<span class="badge-tile__meta">Locked</span>
 							{/if}
 						</div>
 					</article>
@@ -133,17 +137,18 @@
 			</div>
 		</section>
 
-		<!-- ─── Mission History ─── -->
-		<section class="history-section">
+		<section class="page-section">
 			<div class="section-header">
-				<p class="mono-label">Mission log</p>
-				<h2>Recent Attempts</h2>
+				<div>
+					<p class="mono-label">Mission log</p>
+					<h2>Recent attempts</h2>
+				</div>
 			</div>
 
 			{#if profile.recentAttempts.length === 0}
 				<div class="empty-state">
 					<p>No missions attempted yet.</p>
-					<a href="/play" class="cta-button">Start your first mission →</a>
+					<a href="/play" class="cta-button">Play first mission</a>
 				</div>
 			{:else}
 				<div class="history-table">
@@ -155,8 +160,8 @@
 						<span>Time</span>
 						<span>Date</span>
 					</div>
-					{#each profile.recentAttempts as attempt, i}
-						<div class="history-row" style="animation-delay: {i * 40}ms">
+					{#each profile.recentAttempts as attempt}
+						<div class="history-row">
 							<span class="history-row__mission">#{attempt.mission_id}</span>
 							<span class="history-row__outcome {outcomeClass(attempt.outcome)}">
 								{outcomeLabel(attempt.outcome)}
@@ -171,58 +176,148 @@
 			{/if}
 		</section>
 
-		<!-- ─── Quick Links ─── -->
 		<section class="quick-links">
-			<a href="/play" class="cta-button">Play a Mission</a>
-			<a href="/profile/referrals" class="cta-button cta-button--ghost">View Referrals</a>
+			<a href="/play" class="cta-button">Play a mission</a>
 		</section>
 	</main>
 </div>
 
 <style>
 	.profile-shell {
-		--font-display: 'Cormorant Garamond', serif;
-		--font-mono: 'IBM Plex Mono', monospace;
-		--bg: #04060b;
-		--panel: rgba(8, 15, 24, 0.88);
-		--panel-strong: rgba(11, 20, 32, 0.94);
-		--line: rgba(138, 190, 214, 0.14);
-		--text: #f2eee7;
-		--muted: rgba(236, 230, 219, 0.55);
-		--mint: #7df2c9;
-		--amber: #f5c46c;
 		position: relative;
 		min-height: 100vh;
-		color: var(--text);
 	}
 
 	.profile-shell__grain {
 		position: fixed;
 		inset: 0;
 		pointer-events: none;
-		opacity: 0.1;
+		opacity: 0.08;
 		background-image:
 			linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
 			linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
 		background-size: 52px 52px;
-		mask-image: radial-gradient(circle at center, black, transparent 88%);
 	}
 
 	.profile-main {
-		max-width: 960px;
+		position: relative;
+		z-index: 1;
+		max-width: 1100px;
 		margin: 0 auto;
-		padding: 2rem clamp(1rem, 4vw, 3rem) 4rem;
+		padding: 1.5rem clamp(1rem, 4vw, 3rem) 4rem;
 		display: grid;
-		gap: 2rem;
+		gap: 1.25rem;
 	}
 
 	.mono-label {
+		margin: 0;
 		font-family: var(--font-mono);
 		font-size: 0.68rem;
 		letter-spacing: 0.18em;
 		text-transform: uppercase;
-		color: var(--muted);
-		margin: 0;
+		color: var(--text-muted);
+	}
+
+	.profile-hero {
+		display: grid;
+		grid-template-columns: minmax(0, 1.2fr) minmax(18rem, 0.8fr);
+		gap: 1rem;
+	}
+
+	.profile-hero__identity,
+	.profile-rank-card,
+	.stats-strip article,
+	.page-section,
+	.badge-tile,
+	.history-table,
+	.empty-state {
+		border: 1px solid rgba(130, 191, 255, 0.1);
+		border-radius: 1.2rem;
+		background:
+			radial-gradient(circle at top right, rgba(66, 199, 255, 0.06), transparent 24%),
+			linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.015)),
+			var(--surface-1);
+		box-shadow: var(--shadow-hud);
+	}
+
+	.profile-hero__identity,
+	.profile-rank-card,
+	.page-section,
+	.empty-state {
+		padding: 1.25rem;
+	}
+
+	.profile-hero__identity h1,
+	.section-header h2,
+	.profile-rank-card h2 {
+		margin: 0.45rem 0 0;
+		font-family: var(--font-display);
+		line-height: 0.98;
+		font-weight: 600;
+	}
+
+	.profile-hero__identity h1 {
+		font-size: clamp(2.35rem, 5vw, 4.2rem);
+		max-width: 14ch;
+	}
+
+	.profile-hero__copy {
+		max-width: 34rem;
+		margin: 0.85rem 0 0;
+		color: var(--text-soft);
+		line-height: 1.75;
+	}
+
+	.profile-rank-card h2 {
+		font-size: clamp(2.2rem, 4vw, 3.5rem);
+	}
+
+	.profile-rank-card__bar {
+		width: 100%;
+		height: 0.45rem;
+		margin-top: 1rem;
+		border-radius: 999px;
+		background: rgba(255, 255, 255, 0.06);
+		overflow: hidden;
+	}
+
+	.profile-rank-card__fill {
+		height: 100%;
+		background: linear-gradient(90deg, var(--accent-cyan), var(--accent-mint));
+	}
+
+	.profile-rank-card__meta {
+		margin: 0.6rem 0 0;
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		color: var(--text-muted);
+	}
+
+	.stats-strip {
+		display: grid;
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+		gap: 0.85rem;
+	}
+
+	.stats-strip article {
+		padding: 1rem;
+	}
+
+	.stats-strip strong {
+		display: block;
+		margin-top: 0.4rem;
+		font-family: var(--font-display);
+		font-size: 1.85rem;
+		font-weight: 600;
+		line-height: 1;
+	}
+
+	.stats-strip p,
+	.badge-tile__info p,
+	.empty-state p {
+		margin: 0.45rem 0 0;
+		color: var(--text-soft);
+		line-height: 1.6;
 	}
 
 	.section-header {
@@ -230,260 +325,129 @@
 	}
 
 	.section-header h2 {
-		font-family: var(--font-display);
-		font-size: clamp(2rem, 4vw, 3rem);
-		font-weight: 500;
-		line-height: 0.95;
-		margin: 0.3rem 0 0;
+		font-size: clamp(1.9rem, 4vw, 2.8rem);
 	}
 
-	/* ─── Hero Stats ─── */
-	.hero-stats {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 1.5rem;
-	}
-
-	.hero-stats__rank-card {
-		padding: 2rem;
-		border: 1px solid var(--line);
-		background:
-			radial-gradient(circle at top left, rgba(125, 242, 201, 0.1), transparent 40%),
-			var(--panel);
-		display: flex;
-		flex-direction: column;
-		justify-content: center;
-	}
-
-	.hero-stats__rank {
-		font-family: var(--font-display);
-		font-size: clamp(2.5rem, 5vw, 4rem);
-		font-weight: 600;
-		line-height: 1;
-		margin: 0.5rem 0;
-	}
-
-	.hero-stats__xp-bar {
-		width: 100%;
-		height: 6px;
-		background: rgba(255, 255, 255, 0.06);
-		border-radius: 3px;
-		margin-top: 1rem;
-		overflow: hidden;
-	}
-
-	.hero-stats__xp-fill {
-		height: 100%;
-		background: linear-gradient(90deg, var(--mint), var(--amber));
-		border-radius: 3px;
-		transition: width 0.6s ease;
-	}
-
-	.hero-stats__xp-label {
-		font-family: var(--font-mono);
-		font-size: 0.72rem;
-		color: var(--muted);
-		margin: 0.5rem 0 0;
-	}
-
-	.stats-grid {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 0.8rem;
-	}
-
-	.stat-card {
-		padding: 1.2rem;
-		border: 1px solid var(--line);
-		background: var(--panel);
-		text-align: center;
-	}
-
-	.stat-card strong {
-		display: block;
-		font-family: var(--font-display);
-		font-size: 2.2rem;
-		font-weight: 600;
-		margin: 0.4rem 0 0.2rem;
-		color: var(--text);
-	}
-
-	.stat-card__date {
-		font-size: 1.1rem !important;
-	}
-
-	.stat-card p {
-		margin: 0;
-		color: var(--muted);
-		font-size: 0.85rem;
-	}
-
-	.stat-card--accent {
-		background:
-			radial-gradient(circle at bottom right, rgba(125, 242, 201, 0.12), transparent 50%),
-			var(--panel);
-		border-color: rgba(125, 242, 201, 0.25);
-	}
-
-	.stat-card--accent strong {
-		color: var(--mint);
-	}
-
-	/* ─── Badges Gallery ─── */
 	.badges-gallery {
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-		gap: 0.8rem;
+		grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+		gap: 0.85rem;
 	}
 
 	.badge-tile {
 		display: flex;
-		align-items: center;
-		gap: 1rem;
-		padding: 1rem 1.2rem;
-		border: 1px solid var(--line);
-		background: var(--panel);
-		transition: all 0.25s ease;
+		gap: 0.9rem;
+		padding: 1rem;
 	}
 
 	.badge-tile--earned {
-		border-color: rgba(125, 242, 201, 0.3);
+		border-color: rgba(87, 255, 214, 0.16);
 		background:
-			radial-gradient(circle at left, rgba(125, 242, 201, 0.08), transparent 60%),
-			var(--panel);
-	}
-
-	.badge-tile--locked {
-		opacity: 0.5;
-	}
-
-	.badge-tile--locked:hover {
-		opacity: 0.7;
+			radial-gradient(circle at left, rgba(87, 255, 214, 0.06), transparent 60%),
+			linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.015)),
+			var(--surface-1);
 	}
 
 	.badge-tile__icon {
-		font-size: 2rem;
 		flex-shrink: 0;
-		width: 3rem;
-		height: 3rem;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		border-radius: 10px;
-		background: rgba(255, 255, 255, 0.04);
-	}
-
-	.badge-tile--earned .badge-tile__icon {
-		background: rgba(125, 242, 201, 0.12);
+		display: inline-grid;
+		place-items: center;
+		width: 3.15rem;
+		height: 3.15rem;
+		border-radius: 999px;
+		border: 1px solid rgba(130, 191, 255, 0.12);
+		background: rgba(255, 255, 255, 0.03);
+		font-family: var(--font-mono);
+		font-size: 0.7rem;
+		letter-spacing: 0.08em;
 	}
 
 	.badge-tile__info h3 {
 		margin: 0;
 		font-family: var(--font-display);
-		font-size: 1.15rem;
+		font-size: 1.35rem;
 		font-weight: 600;
+		line-height: 1.1;
 	}
 
-	.badge-tile__info p {
-		margin: 0.2rem 0 0;
-		font-size: 0.78rem;
-		color: var(--muted);
-		line-height: 1.4;
-	}
-
-	.badge-tile__date {
+	.badge-tile__meta {
+		display: inline-block;
+		margin-top: 0.55rem;
 		font-family: var(--font-mono);
 		font-size: 0.62rem;
-		letter-spacing: 0.12em;
-		color: var(--mint);
+		letter-spacing: 0.14em;
 		text-transform: uppercase;
+		color: var(--text-muted);
 	}
 
-	.badge-tile__locked-label {
-		font-family: var(--font-mono);
-		font-size: 0.62rem;
-		letter-spacing: 0.12em;
-		text-transform: uppercase;
-		color: var(--muted);
-	}
-
-	/* ─── Mission History ─── */
 	.history-table {
-		border: 1px solid var(--line);
-		background: var(--panel);
-		overflow-x: auto;
+		overflow: hidden;
 	}
 
 	.history-table__header,
 	.history-row {
 		display: grid;
-		grid-template-columns: 80px 100px 70px 70px 60px 1fr;
-		gap: 1rem;
-		padding: 0.8rem 1.2rem;
+		grid-template-columns: 80px 110px 80px 80px 70px 1fr;
+		gap: 0.8rem;
+		padding: 0.9rem 1rem;
 		align-items: center;
 	}
 
 	.history-table__header {
+		border-bottom: 1px solid rgba(130, 191, 255, 0.08);
 		font-family: var(--font-mono);
-		font-size: 0.65rem;
-		letter-spacing: 0.14em;
+		font-size: 0.64rem;
+		letter-spacing: 0.16em;
 		text-transform: uppercase;
-		color: var(--muted);
-		border-bottom: 1px solid var(--line);
+		color: var(--text-muted);
 	}
 
 	.history-row {
-		font-size: 0.88rem;
-		border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-		animation: fadeSlideIn 0.3s ease forwards;
-		opacity: 0;
+		border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+		color: var(--text-soft);
 	}
 
-	@keyframes fadeSlideIn {
-		from {
-			opacity: 0;
-			transform: translateY(4px);
-		}
-		to {
-			opacity: 1;
-			transform: translateY(0);
-		}
+	.history-row:last-child {
+		border-bottom: none;
 	}
 
-	.history-row__mission {
+	.history-row__mission,
+	.history-row__xp {
 		font-family: var(--font-mono);
-		font-weight: 600;
-		color: var(--text);
+	}
+
+	.history-row__xp {
+		color: var(--accent-mint);
 	}
 
 	.history-row__outcome {
 		font-family: var(--font-mono);
-		font-size: 0.72rem;
-		font-weight: 600;
-		letter-spacing: 0.1em;
+		font-size: 0.68rem;
+		letter-spacing: 0.12em;
 		text-transform: uppercase;
 	}
 
-	.outcome--success { color: var(--mint); }
-	.outcome--failed { color: #ff6f61; }
-	.outcome--timeout { color: var(--amber); }
+	.outcome--success {
+		color: var(--accent-mint);
+	}
 
-	.history-row__xp {
-		color: var(--mint);
-		font-weight: 600;
+	.outcome--failed {
+		color: #ff6f61;
+	}
+
+	.outcome--timeout {
+		color: var(--accent-gold);
 	}
 
 	.history-row__date {
-		font-size: 0.75rem;
-		color: var(--muted);
+		color: var(--text-muted);
+		font-size: 0.76rem;
 	}
 
-	/* ─── Quick Links ─── */
 	.quick-links {
 		display: flex;
-		gap: 1rem;
+		gap: 0.9rem;
 		justify-content: center;
-		padding: 1rem 0;
 	}
 
 	.cta-button {
@@ -491,73 +455,63 @@
 		align-items: center;
 		justify-content: center;
 		min-height: 3rem;
-		padding: 0 1.6rem;
+		padding: 0 1.35rem;
+		border-radius: 999px;
+		background: linear-gradient(135deg, var(--accent-cyan), var(--accent-mint));
+		color: #07131f;
 		font-family: var(--font-mono);
-		font-size: 0.72rem;
+		font-size: 0.7rem;
 		font-weight: 600;
-		letter-spacing: 0.14em;
+		letter-spacing: 0.16em;
 		text-transform: uppercase;
 		text-decoration: none;
-		cursor: pointer;
-		border: none;
-		background: var(--mint);
-		color: #052018;
-		transition: all 0.2s ease;
-	}
-
-	.cta-button:hover {
-		filter: brightness(1.12);
-		transform: translateY(-1px);
 	}
 
 	.cta-button--ghost {
 		background: transparent;
-		border: 1px solid var(--line);
-		color: var(--text);
-	}
-
-	.cta-button--ghost:hover {
-		border-color: var(--mint);
-		color: var(--mint);
+		border: 1px solid rgba(130, 191, 255, 0.12);
+		color: var(--text-strong);
 	}
 
 	.empty-state {
 		text-align: center;
-		padding: 3rem 1rem;
-		border: 1px solid var(--line);
-		background: var(--panel);
 	}
 
-	.empty-state p {
-		font-family: var(--font-display);
-		font-size: 1.5rem;
-		margin: 0 0 1rem;
-		color: var(--muted);
+	@media (max-width: 900px) {
+		.profile-hero,
+		.stats-strip {
+			grid-template-columns: 1fr;
+		}
 	}
 
 	@media (max-width: 720px) {
-		.hero-stats {
-			grid-template-columns: 1fr;
+		.profile-main {
+			padding: 1rem 0.9rem 3rem;
 		}
 
-		.stats-grid {
-			grid-template-columns: 1fr 1fr;
+		.profile-hero__identity,
+		.profile-rank-card,
+		.page-section,
+		.empty-state {
+			padding: 1rem;
+			border-radius: 1rem;
 		}
 
 		.badges-gallery {
 			grid-template-columns: 1fr;
 		}
 
+		.history-table {
+			overflow-x: auto;
+		}
+
 		.history-table__header,
 		.history-row {
-			grid-template-columns: 60px 80px 50px 50px 50px 1fr;
-			gap: 0.5rem;
-			font-size: 0.76rem;
+			min-width: 42rem;
 		}
 
 		.quick-links {
 			flex-direction: column;
-			align-items: stretch;
 		}
 	}
 </style>

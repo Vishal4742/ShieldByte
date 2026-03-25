@@ -1,6 +1,7 @@
 import { error, json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { MissionAttemptSchema, recordMissionAttempt } from '$lib/server/gameplay.js';
+import { authenticateRequest } from '$lib/server/auth.js';
 
 export const POST: RequestHandler = async ({ request }) => {
 	let payload: unknown;
@@ -15,6 +16,11 @@ export const POST: RequestHandler = async ({ request }) => {
 
 	if (!parsed.success) {
 		error(400, parsed.error.issues[0]?.message ?? 'Invalid mission attempt payload.');
+	}
+
+	const auth = await authenticateRequest(request, parsed.data.user_id);
+	if ('error' in auth) {
+		error(401, auth.error);
 	}
 
 	try {

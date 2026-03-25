@@ -1,13 +1,24 @@
 <script lang="ts">
+	import { browser } from '$app/environment';
+	import { goto } from '$app/navigation';
 	import type { PageData } from './$types.js';
-	import { fade, slide } from 'svelte/transition';
-	
+
 	let { data }: { data: PageData } = $props();
 	let links = $derived(data.links);
 	let stats = $derived(data.stats);
-	
+	let userId = $derived(data.userId);
+
 	let copiedCode: string | null = $state(null);
-	
+
+	$effect(() => {
+		if (browser && !userId) {
+			const storedId = localStorage.getItem('shieldbyte:player-id');
+			if (storedId) {
+				goto(`/profile/referrals?user_id=${encodeURIComponent(storedId)}`, { replaceState: true });
+			}
+		}
+	});
+
 	function copyLink(code: string) {
 		const url = `${window.location.origin}/challenge/${code}`;
 		navigator.clipboard.writeText(url);
@@ -16,100 +27,280 @@
 			if (copiedCode === code) copiedCode = null;
 		}, 2000);
 	}
+
+	function formatDate(value: string) {
+		return new Date(value).toLocaleDateString('en-IN', {
+			year: 'numeric',
+			month: 'short',
+			day: 'numeric'
+		});
+	}
 </script>
 
 <svelte:head>
 	<title>ShieldByte | Referrals</title>
 </svelte:head>
 
-<div class="max-w-4xl mx-auto p-4 md:p-8 space-y-8 pb-32">
-	<div class="space-y-4 text-center">
-		<h1 class="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-cyan-400">
-			Recruit Network
-		</h1>
-		<p class="text-gray-400 text-lg">Challenge friends, spread awareness, and earn <span class="text-emerald-400 font-bold">500 XP</span> per successful recruit.</p>
-	</div>
-
-	<!-- Stats Grid -->
-	<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-		<div class="bg-gray-800/50 rounded-2xl p-6 border border-emerald-500/20 text-center">
-			<div class="text-emerald-500 mb-2">
-				<svg class="w-8 h-8 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-				</svg>
+<div class="referrals-shell">
+	<main class="referrals-main">
+		<section class="referrals-hero">
+			<div>
+				<p class="mono-label">Referral network</p>
+				<h1>Challenge friends and spread scam awareness.</h1>
+				<p class="referrals-copy">
+					Share a mission link, bring someone into the game, and earn 500 XP for each successful recruit.
+				</p>
 			</div>
-			<div class="text-3xl font-bold text-white mb-1">{stats.totalRecruits}</div>
-			<div class="text-sm text-gray-400 uppercase tracking-widest font-semibold">Total Recruits</div>
-		</div>
+		</section>
 
-		<div class="bg-gray-800/50 rounded-2xl p-6 border border-cyan-500/20 text-center">
-			<div class="text-cyan-500 mb-2">
-				<svg class="w-8 h-8 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-				</svg>
-			</div>
-			<div class="text-3xl font-bold text-white mb-1">{stats.totalClicks}</div>
-			<div class="text-sm text-gray-400 uppercase tracking-widest font-semibold">Link Clicks</div>
-		</div>
+		<section class="stats-strip">
+			<article>
+				<span class="mono-label">Total recruits</span>
+				<strong>{stats.totalRecruits}</strong>
+				<p>successful joins</p>
+			</article>
+			<article>
+				<span class="mono-label">Link clicks</span>
+				<strong>{stats.totalClicks}</strong>
+				<p>challenge opens</p>
+			</article>
+			<article>
+				<span class="mono-label">Bonus XP</span>
+				<strong>+{stats.totalXpEarned}</strong>
+				<p>earned from recruits</p>
+			</article>
+		</section>
 
-		<div class="bg-gradient-to-br from-emerald-500/20 to-cyan-500/20 rounded-2xl p-6 border border-emerald-500/30 text-center relative overflow-hidden">
-			<div class="absolute -right-4 -top-4 w-24 h-24 bg-emerald-500/20 blur-2xl rounded-full"></div>
-			<div class="text-emerald-400 mb-2 relative z-10">
-				<svg class="w-8 h-8 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-				</svg>
+		<section class="referrals-panel">
+			<div class="section-header">
+				<div>
+					<p class="mono-label">Active links</p>
+					<h2>Challenge links</h2>
+				</div>
 			</div>
-			<div class="text-3xl font-bold text-white mb-1 relative z-10">+{stats.totalXpEarned}</div>
-			<div class="text-sm text-gray-400 uppercase tracking-widest font-semibold relative z-10">Bonus XP</div>
-		</div>
-	</div>
 
-	<!-- Links List -->
-	<div class="bg-gray-900 rounded-3xl p-6 border border-gray-800">
-		<h2 class="text-xl font-bold text-white mb-6">Active Challenge Links</h2>
-		
-		{#if links.length === 0}
-			<div class="text-center py-12 text-gray-500">
-				<svg class="w-16 h-16 mx-auto mb-4 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-				</svg>
-				<p class="text-lg">You haven't shared any missions yet.</p>
-				<p class="text-sm mt-2">Finish a mission and tap "Challenge a Friend" to generate a link!</p>
-			</div>
-		{:else}
-			<div class="space-y-4">
-				{#each links as link}
-					<div class="bg-gray-800/50 hover:bg-gray-800 transition-colors rounded-2xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border border-gray-700/50">
-						<div>
-							<div class="text-sm text-gray-400 mb-1">Mission #{link.mission_id} - {new Date(link.created_at).toLocaleDateString()}</div>
-							<div class="font-mono text-emerald-400 tracking-wider font-bold">shieldbyte.app/challenge/{link.code}</div>
-						</div>
-						
-						<div class="flex items-center gap-6 w-full md:w-auto mt-2 md:mt-0">
-							<div class="flex items-center gap-4 text-sm text-gray-400 bg-gray-900 rounded-lg px-3 py-1.5 flex-1 md:flex-none justify-center">
-								<span title="Clicks">👁️ {link.clicks}</span>
-								<span>•</span>
-								<span title="Recruits" class="text-emerald-400 font-semibold">🤝 {link.successful_recruits}</span>
+			{#if links.length === 0}
+				<div class="empty-state">
+					<p>No challenge links yet.</p>
+					<span>Finish a mission and use “Challenge a Friend” to generate your first referral link.</span>
+				</div>
+			{:else}
+				<div class="links-list">
+					{#each links as link}
+						<article class="link-card">
+							<div class="link-card__main">
+								<p class="mono-label">Mission #{link.mission_id}</p>
+								<h3>shieldbyte.app/challenge/{link.code}</h3>
+								<p class="link-card__meta">Created {formatDate(link.created_at)}</p>
 							</div>
-							
-							<button 
-								onclick={() => copyLink(link.code)}
-								class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-xl transition-colors font-semibold text-sm flex items-center gap-2"
-							>
-								{#if copiedCode === link.code}
-									<span in:fade>✓ Copied</span>
-								{:else}
-									<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-									</svg>
-									Copy
-								{/if}
+
+							<div class="link-card__stats">
+								<div>
+									<span class="mono-label">Clicks</span>
+									<strong>{link.clicks}</strong>
+								</div>
+								<div>
+									<span class="mono-label">Recruits</span>
+									<strong>{link.successful_recruits}</strong>
+								</div>
+							</div>
+
+							<button type="button" class="copy-button" onclick={() => copyLink(link.code)}>
+								{copiedCode === link.code ? 'Copied' : 'Copy link'}
 							</button>
-						</div>
-					</div>
-				{/each}
-			</div>
-		{/if}
-	</div>
+						</article>
+					{/each}
+				</div>
+			{/if}
+		</section>
+	</main>
 </div>
+
+<style>
+	.referrals-shell {
+		position: relative;
+		min-height: 100vh;
+	}
+
+	.referrals-main {
+		max-width: 1100px;
+		margin: 0 auto;
+		padding: 1.5rem clamp(1rem, 4vw, 3rem) 4rem;
+		display: grid;
+		gap: 1.25rem;
+	}
+
+	.mono-label {
+		margin: 0;
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		letter-spacing: 0.18em;
+		text-transform: uppercase;
+		color: var(--text-muted);
+	}
+
+	.referrals-hero,
+	.stats-strip article,
+	.referrals-panel,
+	.link-card,
+	.empty-state {
+		border: 1px solid rgba(130, 191, 255, 0.1);
+		border-radius: 1.2rem;
+		background:
+			radial-gradient(circle at top right, rgba(66, 199, 255, 0.06), transparent 24%),
+			linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.015)),
+			var(--surface-1);
+		box-shadow: var(--shadow-hud);
+	}
+
+	.referrals-hero,
+	.referrals-panel,
+	.empty-state {
+		padding: 1.25rem;
+	}
+
+	.referrals-hero h1,
+	.section-header h2,
+	.link-card h3 {
+		margin: 0.45rem 0 0;
+		font-family: var(--font-display);
+		font-weight: 600;
+		line-height: 0.98;
+	}
+
+	.referrals-hero h1 {
+		font-size: clamp(2.35rem, 5vw, 4.1rem);
+		max-width: 15ch;
+	}
+
+	.referrals-copy,
+	.empty-state span,
+	.link-card__meta {
+		margin: 0.85rem 0 0;
+		color: var(--text-soft);
+		line-height: 1.7;
+	}
+
+	.stats-strip {
+		display: grid;
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+		gap: 0.85rem;
+	}
+
+	.stats-strip article {
+		padding: 1rem;
+	}
+
+	.stats-strip strong {
+		display: block;
+		margin-top: 0.4rem;
+		font-family: var(--font-display);
+		font-size: 1.85rem;
+		font-weight: 600;
+		line-height: 1;
+	}
+
+	.stats-strip p {
+		margin: 0.45rem 0 0;
+		color: var(--text-soft);
+	}
+
+	.section-header {
+		margin-bottom: 1rem;
+	}
+
+	.section-header h2 {
+		font-size: clamp(1.9rem, 4vw, 2.8rem);
+	}
+
+	.links-list {
+		display: grid;
+		gap: 0.85rem;
+	}
+
+	.link-card {
+		display: grid;
+		grid-template-columns: minmax(0, 1.3fr) minmax(12rem, 0.55fr) auto;
+		gap: 1rem;
+		align-items: center;
+		padding: 1rem;
+	}
+
+	.link-card h3 {
+		font-size: 1.45rem;
+		word-break: break-word;
+	}
+
+	.link-card__stats {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 0.65rem;
+	}
+
+	.link-card__stats div {
+		padding: 0.75rem;
+		border: 1px solid rgba(130, 191, 255, 0.08);
+		border-radius: 1rem;
+		background: rgba(255, 255, 255, 0.025);
+	}
+
+	.link-card__stats strong {
+		display: block;
+		margin-top: 0.35rem;
+		font-family: var(--font-display);
+		font-size: 1.35rem;
+		font-weight: 600;
+		line-height: 1;
+	}
+
+	.copy-button {
+		min-height: 3rem;
+		padding: 0 1rem;
+		border: 1px solid rgba(130, 191, 255, 0.12);
+		border-radius: 999px;
+		background: linear-gradient(135deg, var(--accent-cyan), var(--accent-mint));
+		color: #07131f;
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		font-weight: 600;
+		letter-spacing: 0.16em;
+		text-transform: uppercase;
+		cursor: pointer;
+	}
+
+	.empty-state {
+		text-align: center;
+	}
+
+	.empty-state p {
+		margin: 0;
+		font-family: var(--font-display);
+		font-size: 1.6rem;
+		font-weight: 600;
+	}
+
+	@media (max-width: 900px) {
+		.stats-strip,
+		.link-card {
+			grid-template-columns: 1fr;
+		}
+
+		.link-card__stats {
+			grid-template-columns: 1fr 1fr;
+		}
+	}
+
+	@media (max-width: 720px) {
+		.referrals-main {
+			padding: 1rem 0.9rem 3rem;
+		}
+
+		.referrals-hero,
+		.referrals-panel,
+		.empty-state,
+		.link-card {
+			padding: 1rem;
+			border-radius: 1rem;
+		}
+	}
+</style>

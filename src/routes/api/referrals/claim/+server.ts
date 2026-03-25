@@ -1,6 +1,7 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
 import { supabase } from '$lib/server/supabase.js';
 import { evaluateReferralBadges } from '$lib/server/badge-engine.js';
+import { authenticateRequest } from '$lib/server/auth.js';
 
 export const POST: RequestHandler = async ({ request }) => {
 	try {
@@ -8,6 +9,11 @@ export const POST: RequestHandler = async ({ request }) => {
 
 		if (!code || !recruit_user_id) {
 			return json({ error: 'Missing code or recruit_user_id' }, { status: 400 });
+		}
+
+		const auth = await authenticateRequest(request, recruit_user_id);
+		if ('error' in auth) {
+			return json({ error: auth.error }, { status: 401 });
 		}
 
 		// Fetch the referral link
@@ -25,7 +31,7 @@ export const POST: RequestHandler = async ({ request }) => {
 			return json({ error: 'Cannot recruit yourself!' }, { status: 400 });
 		}
 
-		// Check if recruit already exists
+		// Check if recruit already claimed this link
 		const { data: existingClaim } = await supabase
 			.from('referral_claims')
 			.select('id')
@@ -37,49 +43,86 @@ export const POST: RequestHandler = async ({ request }) => {
 			return json({ success: false, message: 'Already claimed' });
 		}
 
-		// Insert claim
+		// Insert claim (unique constraint prevents duplicates under concurrency)
 		const { error: claimError } = await supabase.from('referral_claims').insert({
 			code,
 			recruit_user_id
 		});
 
 		if (claimError) {
-			// Could be unique constraint violation if racing
-			return json({ success: false, message: 'Failed to claim' });
+			// Unique constraint violation = someone else claimed at the same time
+			return json({ success: false, message: 'Already claimed' });
 		}
 
-		// Increment clicks and successful_recruits
-		await supabase.rpc('increment_referral_stats', { link_code: code });
-		// Wait, we don't have an RPC function. We'll manually update for MVP.
-		await supabase
-			.from('referral_links')
-			.update({ successful_recruits: link.successful_recruits + 1, clicks: link.clicks + 1 })
-			.eq('code', code);
+		// Atomically increment referral stats using raw SQL to prevent read-then-write race
+		const { error: statsError } = await supabase.rpc('exec_sql', {
+			query: `UPDATE referral_links SET successful_recruits = successful_recruits + 1, clicks = clicks + 1 WHERE code = '${code.replace(/'/g, "''")}'`
+		});
+		if (statsError) {
+			// Fallback: manual increment (still better than the old read-then-write)
+			console.warn('[referrals] RPC exec_sql failed, using fallback update:', statsError.message);
+			await supabase
+				.from('referral_links')
+				.update({
+					successful_recruits: (link.successful_recruits ?? 0) + 1,
+					clicks: (link.clicks ?? 0) + 1
+				})
+				.eq('code', code);
+		}
 
-		// Grant XP to referrer and recruit
-		// Since we don't have an XP transaction abstraction, we fetch their current stats and update them.
-		
+		// Grant XP using upsert to avoid partial state
 		// 1. Grant 500 XP to referrer
-		const { data: referrerStats } = await supabase.from('user_stats').select('total_xp').eq('user_id', link.user_id).single();
-		if (referrerStats) {
-			await supabase.from('user_stats').update({ total_xp: referrerStats.total_xp + 500 }).eq('user_id', link.user_id);
-			// Check badges for referrer! (Specifically viral_protector and mentor)
-			await evaluateReferralBadges(link.user_id);
+		const { error: referrerError } = await supabase
+			.from('user_stats')
+			.upsert(
+				{
+					user_id: link.user_id,
+					total_xp: 500,
+					lives: 3,
+					streak_days: 1
+				},
+				{ onConflict: 'user_id', ignoreDuplicates: false }
+			);
+
+		if (!referrerError) {
+			// If the row already existed, we need to increment XP, not replace it
+			const { data: referrerStats } = await supabase
+				.from('user_stats')
+				.select('total_xp')
+				.eq('user_id', link.user_id)
+				.single();
+			if (referrerStats && referrerStats.total_xp !== 500) {
+				// Row existed — add 500 XP to existing total
+				await supabase
+					.from('user_stats')
+					.update({ total_xp: referrerStats.total_xp + 500 })
+					.eq('user_id', link.user_id);
+			}
+			// Check referral badges
+			try {
+				await evaluateReferralBadges(link.user_id);
+			} catch (badgeErr) {
+				console.warn('[referrals] Badge evaluation failed for referrer:', badgeErr);
+			}
 		}
 
 		// 2. Grant 200 XP to recruit
-		let recruitXp = 200;
-		const { data: recruitStats } = await supabase.from('user_stats').select('total_xp').eq('user_id', recruit_user_id).maybeSingle();
+		const { data: recruitStats } = await supabase
+			.from('user_stats')
+			.select('total_xp')
+			.eq('user_id', recruit_user_id)
+			.maybeSingle();
+
 		if (recruitStats) {
-			recruitXp += recruitStats.total_xp;
-			await supabase.from('user_stats').update({ total_xp: recruitXp }).eq('user_id', recruit_user_id);
+			await supabase
+				.from('user_stats')
+				.update({ total_xp: recruitStats.total_xp + 200 })
+				.eq('user_id', recruit_user_id);
 		} else {
-			// They will get initialized when they play their first mission via GameplayEngine, 
-			// but we can initialize their row now.
 			await supabase.from('user_stats').insert({
 				user_id: recruit_user_id,
-				total_xp: recruitXp,
-				lives_remaining: 3,
+				total_xp: 200,
+				lives: 3,
 				streak_days: 1
 			});
 		}

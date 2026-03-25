@@ -2,7 +2,6 @@
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
-
 	const article = $derived(data.article);
 
 	const categoryLabels: Record<string, string> = {
@@ -27,7 +26,6 @@
 
 	function formatDate(value: string | null): string {
 		if (!value) return 'No publish date';
-
 		return new Intl.DateTimeFormat('en-IN', {
 			day: '2-digit',
 			month: 'short',
@@ -42,87 +40,62 @@
 </script>
 
 <svelte:head>
-	<title>{article.title} | ShieldByte Mission Dossier</title>
+	<title>{article.title} | ShieldByte Dossier</title>
 	<meta name="description" content={article.scenarioSummary} />
 </svelte:head>
 
 <div class="dossier-shell">
-	<header class="dossier-head">
-		<div>
-			<p>Mission dossier</p>
+	<header class="dossier-hero">
+		<div class="dossier-hero__copy">
+			<p class="mono-label">Mission dossier</p>
 			<h1>{article.title}</h1>
-		</div>
-		<div class="dossier-head__meta">
-			<span>{categoryLabels[article.category] ?? article.category}</span>
-			<span>{formatDate(article.publishedAt)}</span>
-		</div>
-	</header>
-
-	<section class="dossier-hero">
-		<div class="dossier-hero__summary">
-			<p class="eyebrow">Round setup</p>
-			<p class="lede">{article.scenarioSummary}</p>
+			<p class="dossier-hero__summary">{article.scenarioSummary}</p>
 
 			<div class="dossier-hero__actions">
-				<a href={`/play?article=${article.id}&type=${encodeURIComponent(article.category)}`}>
-					Deploy mission
+				<a href={`/play?article=${article.id}&type=${encodeURIComponent(article.category)}`} class="dossier-cta">
+					Play this case
 				</a>
-				<a href={article.url} target="_blank" rel="noreferrer" class="dossier-hero__secondary">
-					Read source report
+				<a href={article.url} target="_blank" rel="noreferrer" class="dossier-cta dossier-cta--ghost">
+					Open source report
 				</a>
 			</div>
 		</div>
 
-		<div class="dossier-hero__scoreboard">
+		<div class="dossier-hero__meta">
 			<article>
-				<span>Source</span>
-				<strong>{article.source}</strong>
+				<span class="mono-label">Category</span>
+				<strong>{categoryLabels[article.category] ?? article.category}</strong>
 			</article>
 			<article>
-				<span>Channel</span>
-				<strong>{article.channel}</strong>
+				<span class="mono-label">Published</span>
+				<strong>{formatDate(article.publishedAt)}</strong>
 			</article>
 			<article>
-				<span>Classifier read</span>
+				<span class="mono-label">Classifier read</span>
 				<strong>{formatConfidence(article.confidence)}</strong>
 			</article>
+			<article>
+				<span class="mono-label">Channel</span>
+				<strong>{article.channel}</strong>
+			</article>
 		</div>
-	</section>
+	</header>
 
 	<main class="dossier-grid">
-		<aside class="sidebar">
-			<section class="panel">
-				<p class="panel__label">Target profile</p>
-				<p>{article.victimProfile}</p>
-			</section>
-
-			<section class="panel">
-				<p class="panel__label">Coach tip</p>
-				<p>{article.tip}</p>
-			</section>
-
-			<section class="panel">
-				<p class="panel__label">Live flags</p>
-				<ul class="chips">
-					{#each article.redFlags as redFlag}
-						<li>{redFlag}</li>
-					{/each}
-				</ul>
-			</section>
-		</aside>
-
-		<section class="panel panel--wide">
-			<div class="section-heading">
-				<p>Signal board</p>
-				<h2>What players should catch in the round</h2>
+		<section class="dossier-panel">
+			<div class="section-header">
+				<div>
+					<p class="mono-label">Signal board</p>
+					<h2>What the player should catch</h2>
+				</div>
 			</div>
 
 			<div class="clue-grid">
 				{#each article.clues as clue, index}
 					<article class="clue-card">
-						<div class="clue-card__topline">
-							<span>{String(index + 1).padStart(2, '0')}</span>
-							<strong>{clueLabels[clue.type] ?? clue.type}</strong>
+						<div class="clue-card__top">
+							<span class="mono-label">{String(index + 1).padStart(2, '0')}</span>
+							<span class="mono-label">{clueLabels[clue.type] ?? clue.type}</span>
 						</div>
 						<h3>{clue.clueText}</h3>
 						<p>{clue.explanation}</p>
@@ -131,26 +104,50 @@
 			</div>
 		</section>
 
-		<section class="panel panel--wide">
-			<div class="section-heading">
-				<p>Case transcript</p>
-				<h2>Stored source copy behind the mission</h2>
-			</div>
+		<aside class="dossier-sidebar">
+			<section class="dossier-panel">
+				<p class="mono-label">Victim profile</p>
+				<p>{article.victimProfile}</p>
+			</section>
 
+			<section class="dossier-panel">
+				<p class="mono-label">Defensive tip</p>
+				<p>{article.tip}</p>
+			</section>
+
+			<section class="dossier-panel">
+				<p class="mono-label">Live flags</p>
+				<ul class="chips">
+					{#each article.redFlags as redFlag}
+						<li>{redFlag}</li>
+					{/each}
+				</ul>
+			</section>
+		</aside>
+
+		<section class="dossier-panel dossier-panel--wide">
+			<div class="section-header">
+				<div>
+					<p class="mono-label">Source transcript</p>
+					<h2>Underlying case text</h2>
+				</div>
+			</div>
 			<div class="body-copy">{article.body}</div>
 		</section>
 
-		<section class="panel panel--wide">
-			<div class="section-heading">
-				<p>Parser log</p>
-				<h2>Structured fields captured from the article</h2>
+		<section class="dossier-panel dossier-panel--wide">
+			<div class="section-header">
+				<div>
+					<p class="mono-label">Parser log</p>
+					<h2>Captured structured fields</h2>
+				</div>
 			</div>
 
 			{#if article.rawExtractionFields.length > 0}
-				<div class="extraction-grid">
+				<div class="field-grid">
 					{#each article.rawExtractionFields as field}
 						<article class="field-card">
-							<span>{field.label}</span>
+							<span class="mono-label">{field.label}</span>
 							{#if Array.isArray(field.value)}
 								<ul>
 									{#each field.value as item}
@@ -172,206 +169,222 @@
 
 <style>
 	.dossier-shell {
-		padding: 1.25rem clamp(1.2rem, 4vw, 3rem) 4rem;
+		max-width: 1200px;
+		margin: 0 auto;
+		padding: 1.5rem clamp(1rem, 4vw, 3rem) 4rem;
 	}
 
-	.dossier-head,
-	.dossier-head__meta,
-	.section-heading,
-	.clue-card__topline,
-	.dossier-hero__actions {
-		display: flex;
-		justify-content: space-between;
-		gap: 1rem;
-		align-items: flex-start;
-	}
-
-	.dossier-head p,
-	.dossier-head__meta span,
-	.section-heading p,
-	.panel__label,
-	.eyebrow,
-	.clue-card__topline span,
-	.field-card span {
+	.mono-label {
+		margin: 0;
 		font-family: var(--font-mono);
-		font-size: 0.72rem;
+		font-size: 0.68rem;
 		letter-spacing: 0.18em;
 		text-transform: uppercase;
 		color: var(--text-muted);
 	}
 
-	.dossier-head {
-		margin-top: 0.3rem;
-	}
-
-	.dossier-head h1,
-	.section-heading h2 {
-		margin: 0.45rem 0 0;
-		font-family: var(--font-display);
-		font-size: clamp(2.6rem, 6vw, 5rem);
-		font-weight: 500;
-		line-height: 0.94;
-	}
-
-	.dossier-head__meta {
-		flex-wrap: wrap;
-	}
-
-	.dossier-head__meta span,
-	.dossier-hero__scoreboard article,
-	.panel,
+	.dossier-hero,
+	.dossier-panel,
 	.clue-card,
 	.field-card {
-		padding: 0.9rem 1rem;
-		border: 1px solid var(--line-soft);
+		border: 1px solid rgba(130, 191, 255, 0.1);
+		border-radius: 1.2rem;
 		background:
-			linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01)),
+			radial-gradient(circle at top right, rgba(66, 199, 255, 0.06), transparent 24%),
+			linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.015)),
 			var(--surface-1);
-		box-shadow: var(--shadow-arcade);
+		box-shadow: var(--shadow-hud);
 	}
 
 	.dossier-hero {
 		display: grid;
-		grid-template-columns: minmax(0, 1.2fr) minmax(18rem, 0.8fr);
+		grid-template-columns: minmax(0, 1.25fr) minmax(18rem, 0.75fr);
 		gap: 1rem;
-		margin-top: 1rem;
+		padding: 1.25rem;
+	}
+
+	.dossier-hero__copy h1,
+	.section-header h2,
+	.clue-card h3 {
+		margin: 0.45rem 0 0;
+		font-family: var(--font-display);
+		line-height: 0.98;
+		font-weight: 600;
+	}
+
+	.dossier-hero__copy h1 {
+		font-size: clamp(2.4rem, 5vw, 4.5rem);
+		max-width: 14ch;
 	}
 
 	.dossier-hero__summary,
-	.dossier-hero__scoreboard {
-		padding: 1.2rem;
-		border: 1px solid var(--line-soft);
-		background:
-			radial-gradient(circle at top right, rgba(255, 183, 77, 0.1), transparent 24%),
-			radial-gradient(circle at bottom left, rgba(114, 255, 214, 0.06), transparent 18%),
-			linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01)),
-			var(--surface-2);
-		box-shadow: var(--shadow-arcade);
-	}
-
-	.lede,
-	.panel p,
+	.dossier-panel p,
 	.clue-card p,
 	.body-copy,
 	.field-card p,
 	.field-card li,
 	.empty-copy {
 		color: var(--text-soft);
-		line-height: 1.75;
+		line-height: 1.72;
 	}
 
-	.lede {
-		margin: 0.55rem 0 0;
-		font-size: 1.02rem;
+	.dossier-hero__summary {
+		max-width: 38rem;
+		margin: 0.85rem 0 0;
+		font-size: 1rem;
 	}
 
 	.dossier-hero__actions {
-		margin-top: 1.4rem;
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.8rem;
+		margin-top: 1.15rem;
 	}
 
-	.dossier-hero__actions a {
+	.dossier-cta {
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
 		min-height: 3rem;
 		padding: 0 1.2rem;
+		border-radius: 999px;
+		background: linear-gradient(135deg, var(--accent-cyan), var(--accent-mint));
+		color: #07131f;
+		font-family: var(--font-mono);
+		font-size: 0.7rem;
+		font-weight: 600;
+		letter-spacing: 0.16em;
+		text-transform: uppercase;
 		text-decoration: none;
-		font-family: var(--font-mono);
-		font-size: 0.72rem;
-		letter-spacing: 0.16em;
-		text-transform: uppercase;
 	}
 
-	.dossier-hero__actions a:first-child {
-		background: linear-gradient(135deg, var(--accent-gold), #ffd48a);
-		color: #091018;
-	}
-
-	.dossier-hero__secondary {
-		border: 1px solid rgba(255, 255, 255, 0.08);
-		background: rgba(255, 255, 255, 0.03);
+	.dossier-cta--ghost {
+		background: transparent;
+		border: 1px solid rgba(130, 191, 255, 0.12);
 		color: var(--text-strong);
 	}
 
-	.dossier-hero__scoreboard {
+	.dossier-hero__meta {
 		display: grid;
-		gap: 0.85rem;
+		grid-template-columns: 1fr 1fr;
+		gap: 0.8rem;
 	}
 
-	.dossier-hero__scoreboard span {
-		font-family: var(--font-mono);
-		font-size: 0.72rem;
-		letter-spacing: 0.16em;
-		text-transform: uppercase;
-		color: var(--text-muted);
+	.dossier-hero__meta article {
+		padding: 0.85rem;
+		border: 1px solid rgba(130, 191, 255, 0.08);
+		border-radius: 1rem;
+		background: rgba(255, 255, 255, 0.025);
 	}
 
-	.dossier-hero__scoreboard strong {
+	.dossier-hero__meta strong {
 		display: block;
-		margin-top: 0.45rem;
-		font-size: 1.1rem;
-		color: var(--text-strong);
+		margin-top: 0.35rem;
+		font-family: var(--font-display);
+		font-size: 1.35rem;
+		font-weight: 600;
+		line-height: 1.05;
 	}
 
 	.dossier-grid {
 		display: grid;
 		grid-template-columns: minmax(0, 1.15fr) minmax(18rem, 0.85fr);
-		gap: 1.25rem;
-		margin-top: 1.25rem;
+		gap: 1rem;
+		margin-top: 1rem;
 		align-items: start;
 	}
 
-	.sidebar {
+	.dossier-sidebar {
 		display: grid;
 		gap: 1rem;
 	}
 
-	.panel--wide {
+	.dossier-panel {
+		padding: 1.2rem;
+	}
+
+	.dossier-panel--wide {
 		grid-column: 1 / -1;
 	}
 
+	.section-header {
+		margin-bottom: 1rem;
+	}
+
+	.section-header h2 {
+		font-size: clamp(1.9rem, 4vw, 2.9rem);
+	}
+
 	.clue-grid,
-	.extraction-grid {
+	.field-grid {
 		display: grid;
 		grid-template-columns: repeat(3, minmax(0, 1fr));
-		gap: 1rem;
+		gap: 0.85rem;
+	}
+
+	.clue-card,
+	.field-card {
+		padding: 1rem;
+	}
+
+	.clue-card__top {
+		display: flex;
+		justify-content: space-between;
+		gap: 0.8rem;
 	}
 
 	.clue-card h3 {
-		margin: 0.9rem 0 0.6rem;
-		font-size: 1.2rem;
+		font-size: 1.45rem;
 	}
 
 	.chips,
 	.field-card ul {
 		display: flex;
 		flex-wrap: wrap;
-		gap: 0.65rem;
+		gap: 0.55rem;
 		padding: 0;
-		margin: 0;
+		margin: 0.75rem 0 0;
 		list-style: none;
 	}
 
 	.chips li,
 	.field-card li {
-		padding: 0.45rem 0.8rem;
-		background: rgba(255, 255, 255, 0.05);
+		padding: 0.38rem 0.7rem;
+		border: 1px solid rgba(130, 191, 255, 0.1);
+		border-radius: 999px;
+		background: rgba(255, 255, 255, 0.03);
 	}
 
 	.body-copy {
 		white-space: pre-wrap;
 	}
 
-	@media (max-width: 960px) {
-		.dossier-head,
+	@media (max-width: 980px) {
 		.dossier-hero,
 		.dossier-grid,
 		.clue-grid,
-		.extraction-grid {
+		.field-grid {
+			grid-template-columns: 1fr;
+		}
+	}
+
+	@media (max-width: 720px) {
+		.dossier-shell {
+			padding: 1rem 0.9rem 3rem;
+		}
+
+		.dossier-hero,
+		.dossier-panel,
+		.clue-card,
+		.field-card {
+			padding: 1rem;
+			border-radius: 1rem;
+		}
+
+		.dossier-hero__meta {
 			grid-template-columns: 1fr;
 		}
 
-		.dossier-head,
 		.dossier-hero__actions {
 			flex-direction: column;
 		}

@@ -168,10 +168,15 @@ export async function evaluateBadges(event: BadgeEventData): Promise<EarnedBadge
 }
 
 export async function evaluateReferralBadges(userId: string): Promise<EarnedBadge[]> {
-	const { data: existingBadges } = await supabase
+	const { data: existingBadges, error: badgesError } = await supabase
 		.from('user_badges')
 		.select('badge_id')
 		.eq('user_id', userId);
+
+	if (badgesError) {
+		console.error('[badge-engine] evaluateReferralBadges: failed to fetch existing badges:', badgesError.message);
+		return []; // Fail safe: don't re-award badges if we can't check existing ones
+	}
 
 	const earnedSet = new Set((existingBadges ?? []).map((b: { badge_id: string }) => b.badge_id));
 	const candidateIds: string[] = [];
@@ -265,10 +270,10 @@ async function countPerfectFraudTypeMissions(userId: string, fraudType: string):
 async function checkPerfectWeek(userId: string): Promise<boolean> {
 	const { data, error } = await supabase
 		.from('mission_attempts')
-		.select('wrong_taps, clues_missed, outcome, completed_at')
+		.select('wrong_taps, clues_missed, outcome, created_at')
 		.eq('user_id', userId)
 		.eq('outcome', 'success')
-		.order('completed_at', { ascending: false })
+		.order('created_at', { ascending: false })
 		.limit(20); // fetch extra to find 7 distinct days
 
 	if (error || !data) {
@@ -280,7 +285,7 @@ async function checkPerfectWeek(userId: string): Promise<boolean> {
 	let perfectDays = 0;
 
 	for (const attempt of data) {
-		const day = new Date(attempt.completed_at).toISOString().slice(0, 10);
+		const day = new Date(attempt.created_at).toISOString().slice(0, 10);
 		if (seenDays.has(day)) {
 			continue;
 		}

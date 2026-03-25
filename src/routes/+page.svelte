@@ -1,7 +1,6 @@
 <script lang="ts">
 	import Hero from '$lib/components/home/Hero.svelte';
 	import SwipeDeck from '$lib/components/home/SwipeDeck.svelte';
-	import TrainingDeck from '$lib/components/home/TrainingDeck.svelte';
 	import ThreatCard from '$lib/components/home/ThreatCard.svelte';
 	import type { PageData } from './$types';
 
@@ -12,42 +11,28 @@
 	<title>ShieldByte | Scam Defense Arcade</title>
 	<meta
 		name="description"
-		content="ShieldByte turns real scam cases into game-like practice rounds so new users can learn fast and keep playing."
+		content="ShieldByte turns real scam cases into short game rounds where users decide scam or not and learn the warning signs."
 	/>
 </svelte:head>
 
 <div class="shell">
 	<div class="shell__grain"></div>
-	<div class="shell__glow shell__glow--left"></div>
-	<div class="shell__glow shell__glow--right"></div>
+	<div class="shell__stars"></div>
 
 	<main>
 		<Hero articles={data.articles} />
 
-		<section class="start-strip">
-			<article>
-				<span>Choose dossier</span>
-				<p>Pick a mission from the queue and read the setup like a pre-round briefing.</p>
-			</article>
-			<article>
-				<span>Read the board</span>
-				<p>Study the live signals, pressure cues, and scam pattern before you deploy.</p>
-			</article>
-			<article>
-				<span>Clear the run</span>
-				<p>Enter Scam Hunt, protect your shields, and finish the round clean.</p>
-			</article>
+		<section id="queue">
+			<SwipeDeck articles={data.articles} />
 		</section>
-
-		<SwipeDeck articles={data.articles} />
 
 		<section class="feed-panel" id="feed">
 			<div class="section-heading section-heading--row">
 				<div>
-					<p>Mission archive</p>
-					<h2>Playable dossier board</h2>
+					<p>Case archive</p>
+					<h2>Study real scam patterns</h2>
 				</div>
-				<span class="feed-panel__hint">Each dossier is a real scam pattern translated into a playable run. Start simple, then move into messy live cases.</span>
+				<span class="feed-panel__hint">Open any dossier to see the source case, the warning signs, and the mission generated from it.</span>
 			</div>
 
 			{#if data.articles.length > 0}
@@ -63,8 +48,6 @@
 				</div>
 			{/if}
 		</section>
-
-		<TrainingDeck article={data.featuredArticle} mission={data.featuredMission} />
 	</main>
 </div>
 
@@ -84,32 +67,20 @@
 			linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
 			linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
 		background-size: 52px 52px;
-		mask-image: radial-gradient(circle at center, black, transparent 88%);
 	}
 
-	.shell__glow {
+	.shell__stars {
 		position: fixed;
-		width: 32rem;
-		height: 32rem;
-		border-radius: 999px;
-		filter: blur(90px);
+		inset: 0;
 		pointer-events: none;
-		opacity: 0.12;
+		background:
+			radial-gradient(circle at 16% 22%, rgba(255, 255, 255, 0.34) 0 1px, transparent 1px),
+			radial-gradient(circle at 68% 12%, rgba(255, 255, 255, 0.18) 0 1px, transparent 1px),
+			radial-gradient(circle at 84% 38%, rgba(255, 255, 255, 0.22) 0 1px, transparent 1px),
+			radial-gradient(circle at 34% 72%, rgba(255, 255, 255, 0.18) 0 1px, transparent 1px);
+		opacity: 0.4;
 	}
 
-	.shell__glow--left {
-		top: -8rem;
-		left: -8rem;
-		background: #f2ab5a;
-	}
-
-	.shell__glow--right {
-		top: 8rem;
-		right: -12rem;
-		background: #5c7fd8;
-	}
-
-	.start-strip span,
 	.section-heading p,
 	.feed-panel__hint,
 	.empty-state span {
@@ -126,59 +97,29 @@
 		padding: 0 clamp(1.2rem, 4vw, 3rem) 4rem;
 	}
 
-	.start-strip,
 	.feed-panel,
 	.empty-state {
-		padding: 1.2rem;
-		border: 1px solid var(--line-soft);
+		padding: 1.25rem;
+		border: 1px solid var(--panel-border);
+		border-radius: 1.35rem;
 		background:
-			radial-gradient(circle at top right, rgba(114, 255, 214, 0.07), transparent 24%),
+			radial-gradient(circle at top right, rgba(66, 199, 255, 0.09), transparent 24%),
 			linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01)),
 			var(--surface-1);
-		box-shadow: var(--shadow-arcade);
-	}
-
-	.start-strip {
-		display: grid;
-		grid-template-columns: repeat(3, minmax(0, 1fr));
-		gap: 0.9rem;
-		margin-top: 0.8rem;
-	}
-
-	.start-strip article {
-		padding: 1rem;
-		border: 1px solid rgba(255, 255, 255, 0.1);
-		background: rgba(255, 255, 255, 0.04);
-	}
-
-	.start-strip p {
-		margin: 0.55rem 0 0;
-		color: var(--text-strong);
-		line-height: 1.6;
-	}
-
-	.start-strip article:first-child {
-		border-color: rgba(255, 183, 77, 0.24);
-	}
-
-	.start-strip article:nth-child(2) {
-		border-color: rgba(114, 255, 214, 0.2);
-	}
-
-	.start-strip article:nth-child(3) {
-		border-color: rgba(255, 103, 77, 0.18);
+		box-shadow: var(--shadow-hud);
 	}
 
 	.feed-panel {
-		margin-top: 1rem;
+		margin-top: 1.25rem;
 	}
 
 	.section-heading h2 {
 		margin: 0.35rem 0 0;
 		font-family: var(--font-display);
 		font-size: clamp(2.2rem, 5vw, 3.9rem);
-		font-weight: 500;
+		font-weight: 700;
 		line-height: 0.94;
+		text-transform: uppercase;
 	}
 
 	.section-heading--row {
@@ -212,7 +153,6 @@
 	}
 
 	@media (max-width: 1100px) {
-		.start-strip,
 		.feed-grid {
 			grid-template-columns: 1fr;
 		}
@@ -224,6 +164,36 @@
 	}
 
 	@media (max-width: 720px) {
+		main {
+			padding: 0 0.85rem 3rem;
+		}
+
+		.feed-panel,
+		.empty-state {
+			padding: 1rem;
+			border-radius: 1rem;
+		}
+
+		.section-heading p,
+		.feed-panel__hint,
+		.empty-state span {
+			font-size: 0.62rem;
+			letter-spacing: 0.14em;
+		}
+
+		.section-heading h2 {
+			font-size: clamp(1.9rem, 9vw, 2.6rem);
+		}
+
+		.feed-panel__hint {
+			max-width: none;
+		}
+	}
+
+	@media (max-width: 480px) {
+		.empty-state p {
+			font-size: 1.6rem;
+		}
 	}
 
 	@media (prefers-reduced-motion: reduce) {

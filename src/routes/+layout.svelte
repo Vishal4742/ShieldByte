@@ -9,7 +9,7 @@
 	<link rel="preconnect" href="https://fonts.googleapis.com" />
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
 	<link
-		href="https://fonts.googleapis.com/css2?family=Oxanium:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+		href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
 		rel="stylesheet"
 	/>
 </svelte:head>
@@ -19,7 +19,7 @@
 		<span class="global-nav__logo">SB</span>
 		<span>
 			<span class="global-nav__name">ShieldByte</span>
-			<span class="global-nav__tag">arcade scam simulator</span>
+			<span class="global-nav__tag">play to spot scams</span>
 		</span>
 	</a>
 
@@ -27,12 +27,11 @@
 		<a href="/" class="global-nav__link">Home</a>
 		<a href="/play" class="global-nav__link">Play</a>
 		<a href="/profile" class="global-nav__link">Profile</a>
-		<a href="/profile/referrals" class="global-nav__link">Referrals</a>
 	</div>
 
 	<div class="global-nav__status">
 		<span class="global-nav__dot"></span>
-		<span>mission board live</span>
+		<span>live mission board</span>
 	</div>
 </nav>
 
@@ -44,8 +43,8 @@
 	}
 
 	:global(:root) {
-		--font-display: 'Oxanium', sans-serif;
-		--font-body: 'Space Grotesk', sans-serif;
+		--font-display: 'Cormorant Garamond', serif;
+		--font-body: 'Cormorant Garamond', serif;
 		--font-mono: 'IBM Plex Mono', monospace;
 		--surface-0: #040814;
 		--surface-1: rgba(7, 16, 28, 0.86);
@@ -70,9 +69,9 @@
 	:global(body) {
 		margin: 0;
 		background:
-			radial-gradient(circle at top left, rgba(66, 199, 255, 0.18), transparent 20%),
-			radial-gradient(circle at 82% 12%, rgba(87, 255, 214, 0.11), transparent 16%),
-			radial-gradient(circle at 50% 120%, rgba(255, 107, 107, 0.08), transparent 26%),
+			radial-gradient(48rem 24rem at 18% 0%, rgba(66, 199, 255, 0.1), transparent 68%),
+			radial-gradient(36rem 20rem at 88% 10%, rgba(87, 255, 214, 0.07), transparent 72%),
+			radial-gradient(40rem 18rem at 50% 100%, rgba(255, 107, 107, 0.04), transparent 74%),
 			linear-gradient(180deg, #081120 0%, #040814 48%, #071528 100%);
 		color: var(--text-strong);
 		font-family: var(--font-body);
@@ -83,13 +82,13 @@
 		position: fixed;
 		inset: 0;
 		pointer-events: none;
-		opacity: 0.22;
+		opacity: 0.14;
 		background-image:
 			linear-gradient(rgba(114, 184, 255, 0.08) 1px, transparent 1px),
 			linear-gradient(90deg, rgba(114, 184, 255, 0.06) 1px, transparent 1px),
 			linear-gradient(rgba(255, 255, 255, 0.02) 50%, transparent 50%);
 		background-size: 56px 56px, 56px 56px, 100% 4px;
-		mask-image: radial-gradient(circle at center, black, transparent 88%);
+		mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.8), transparent 94%);
 	}
 
 	:global(body)::after {
@@ -102,7 +101,7 @@
 			radial-gradient(circle at 72% 32%, rgba(255, 255, 255, 0.15) 0 1px, transparent 1px),
 			radial-gradient(circle at 48% 74%, rgba(255, 255, 255, 0.16) 0 1px, transparent 1px),
 			radial-gradient(circle at 88% 62%, rgba(255, 255, 255, 0.12) 0 1px, transparent 1px);
-		opacity: 0.28;
+		opacity: 0.18;
 	}
 
 	.global-nav {
@@ -222,17 +221,46 @@
 	@media (max-width: 760px) {
 		.global-nav {
 			flex-direction: column;
-			gap: 0.7rem;
-			align-items: flex-start;
+			gap: 0.8rem;
+			align-items: stretch;
+			padding: 0.9rem 1rem;
+		}
+
+		.global-nav__brand {
+			width: 100%;
 		}
 
 		.global-nav__links {
-			flex-wrap: wrap;
+			display: grid;
+			grid-template-columns: repeat(3, minmax(0, 1fr));
+			width: 100%;
+			gap: 0.45rem;
+		}
+
+		.global-nav__link {
+			justify-content: center;
+			padding: 0.8rem 0.7rem;
 		}
 
 		.global-nav__status {
 			align-self: stretch;
 			justify-content: center;
+		}
+	}
+
+	@media (max-width: 480px) {
+		.global-nav__name {
+			font-size: 0.88rem;
+		}
+
+		.global-nav__tag,
+		.global-nav__status,
+		.global-nav__link {
+			font-size: 0.58rem;
+		}
+
+		.global-nav__links {
+			grid-template-columns: repeat(3, minmax(0, 1fr));
 		}
 	}
 </style>

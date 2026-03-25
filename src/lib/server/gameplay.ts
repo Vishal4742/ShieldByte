@@ -48,7 +48,7 @@ function evaluateRank(totalXp: number) {
 	return 'Rookie Agent';
 }
 
-function computeNextStreak(lastMissionAt: string | null, now = new Date()) {
+function computeNextStreak(lastMissionAt: string | null, currentStreak: number, now = new Date()) {
 	if (!lastMissionAt) {
 		return 1;
 	}
@@ -69,7 +69,7 @@ function computeNextStreak(lastMissionAt: string | null, now = new Date()) {
 	const diffMs = now.getTime() - previous.getTime();
 	const diffHours = diffMs / (1000 * 60 * 60);
 
-	return diffHours <= 48 ? 2 : 1;
+	return diffHours <= 48 ? (currentStreak + 1) : 1;
 }
 
 export async function recordMissionAttempt(payload: MissionAttemptPayload) {
@@ -106,7 +106,7 @@ export async function recordMissionAttempt(payload: MissionAttemptPayload) {
 	}
 
 	const existingXp = currentStats?.total_xp ?? 0;
-	const streakDays = computeNextStreak(currentStats?.last_mission_at ?? null, now);
+	const streakDays = computeNextStreak(currentStats?.last_mission_at ?? null, currentStats?.streak_days ?? 0, now);
 	const nextTotalXp = existingXp + payload.xp_earned;
 	const nextStreakDays =
 		streakDays === null ? (currentStats?.streak_days ?? 1) : Math.max(1, streakDays);

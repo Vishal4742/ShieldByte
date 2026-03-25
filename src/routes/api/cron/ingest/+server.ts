@@ -13,12 +13,21 @@ import type { RequestHandler } from './$types';
 import { CRON_SECRET } from '$env/static/private';
 import { runIngestionPipeline } from '$lib/server/news-ingestion';
 
+// In-memory concurrency guard to prevent overlapping cron runs
+let isRunning = false;
+
 export const GET: RequestHandler = async ({ request }) => {
 	// Verify cron secret
 	const authHeader = request.headers.get('x-cron-secret');
 	if (authHeader !== CRON_SECRET) {
 		error(401, 'Unauthorized');
 	}
+
+	if (isRunning) {
+		return json({ success: false, message: 'Ingestion pipeline already running' }, { status: 429 });
+	}
+
+	isRunning = true;
 
 	try {
 		const result = await runIngestionPipeline();
@@ -31,5 +40,7 @@ export const GET: RequestHandler = async ({ request }) => {
 	} catch (err) {
 		console.error('[cron/ingest] Pipeline failed:', err);
 		error(500, 'Ingestion pipeline failed');
+	} finally {
+		isRunning = false;
 	}
 };

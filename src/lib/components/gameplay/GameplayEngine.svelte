@@ -24,12 +24,22 @@
 	let { mission, streakDays = 0 }: Props = $props();
 
 	const segments = $derived(buildMissionSegments(mission.messageBody, mission.clues));
+	const matchedClueIds = $derived(
+		new Set(
+			segments
+				.map((segment) => segment.clueId)
+				.filter((clueId): clueId is number => clueId !== null)
+		)
+	);
+	const fallbackClues = $derived(
+		mission.clues.filter((clue) => !matchedClueIds.has(clue.id))
+	);
 
 	let foundIds = $state<number[]>([]);
 	let wrongTaps = $state(0);
 	let secondsRemaining = $state(MISSION_DURATION_SECONDS);
 	let paused = $state(false);
-	let missionState = $state<'ready' | 'active' | 'finished'>('ready');
+	let missionState = $state<'ready' | 'judging' | 'active' | 'finished'>('ready');
 	let livesState = $state<LivesState>({
 		lives: 3,
 		lastUpdatedAt: Date.now(),
@@ -44,6 +54,7 @@
 	let saveState = $state<'idle' | 'saving' | 'saved' | 'error'>('idle');
 	let saveMessage = $state('Mission result will save when the run ends.');
 	let profileSnapshot = $state<PlayerStatsSnapshot | null>(null);
+	let playerToken = $state<string | null>(null);
 
 	// ── AI Feedback state ──
 	interface AIFeedback {
@@ -72,9 +83,6 @@
 	let rankUp = $state<RankUp | null>(null);
 
 	// ── Referral Share state ──
-	let shareLinkText = $state('Challenge a Friend');
-	let isGeneratingLink = $state(false);
-
 	let tickTimer: number | undefined;
 	let livesTimer: number | undefined;
 	let flashTimer: number | undefined;
@@ -84,11 +92,14 @@
 	let swipeStartX = $state(0);
 	let comboChain = $state(0);
 	let bestCombo = $state(0);
+	let verdictChoice = $state<'scam' | 'safe' | null>(null);
+	let verdictCorrect = $state<boolean | null>(null);
+	let verdictProcessing = $state(false);
 	const missionLabel = $derived(mission.fraudType.replaceAll('_', ' '));
 	const beginnerSteps = [
-		'Tap only the risky words or phrases in the message.',
-		'Each wrong tap breaks one shield.',
-		'Clear every red flag before the round clock hits zero.'
+		'Read the message and decide: scam or safe.',
+		'Then tap the risky words or phrases.',
+		'Each wrong move costs a shield before the timer runs out.'
 	];
 
 	const allCluesFound = $derived(foundIds.length === mission.clues.length);
@@ -160,9 +171,15 @@
 
 		// Server-authoritative sync: POST and adopt server response as truth
 		try {
+			const headers: Record<string, string> = { 'content-type': 'application/json' };
+			if (playerToken) {
+				headers['x-player-token'] = playerToken;
+				headers['x-player-id'] = playerId!;
+			}
+
 			const res = await fetch('/api/lives', {
 				method: 'POST',
-				headers: { 'content-type': 'application/json' },
+				headers,
 				body: JSON.stringify({ user_id: playerId, lives_remaining: nextState.lives })
 			});
 
@@ -176,16 +193,51 @@
 	}
 
 	function beginMission() {
-		if (missionState === 'active' || result || livesState.lives <= 0) {
+		if (missionState === 'active' || missionState === 'judging' || result || livesState.lives <= 0) {
 			return;
 		}
 
-		missionState = 'active';
+		missionState = 'judging';
 		paused = false;
-		feedbackTitle = 'Mission live';
-		feedbackBody = 'Incoming message intercepted. Tap only the parts that would put a real player at risk.';
+		verdictChoice = null;
+		verdictCorrect = null;
+		feedbackTitle = 'Make your call';
+		feedbackBody = 'First decide whether this message is a scam or safe. Then the clue hunt begins.';
 		swipeOffsetX = 0;
 		swipeDragging = false;
+	}
+
+	async function resolveVerdict(choice: 'scam' | 'safe') {
+		if (missionState !== 'judging' || result || verdictChoice !== null || verdictProcessing) {
+			return;
+		}
+
+		verdictProcessing = true;
+		verdictChoice = choice;
+		const isCorrect = choice === 'scam';
+		verdictCorrect = isCorrect;
+
+		if (isCorrect) {
+			feedbackTitle = 'Correct judgment';
+			feedbackBody = 'This is a scam. Now lock the exact warning signs before the clock runs out.';
+		} else {
+			const nextLives = consumeLife(livesState, Date.now());
+			livesState = nextLives; // Optimistic update before server call
+			wrongTaps += 1;
+			comboChain = 0;
+			feedbackTitle = 'Wrong judgment';
+			feedbackBody = 'This case is a scam. You lost one shield, but you can still recover by finding the clues.';
+			await persistLives(nextLives);
+
+			if (livesState.lives <= 0) {
+				verdictProcessing = false;
+				finishMission('failed');
+				return;
+			}
+		}
+
+		verdictProcessing = false;
+		missionState = 'active';
 		startTimers();
 	}
 
@@ -350,11 +402,15 @@
 		saveMessage = 'Saving mission attempt...';
 
 		try {
+			const headers: Record<string, string> = { 'content-type': 'application/json' };
+			if (playerToken) {
+				headers['x-player-token'] = playerToken;
+				headers['x-player-id'] = playerId!;
+			}
+
 			const response = await fetch('/api/missions/attempt', {
 				method: 'POST',
-				headers: {
-					'content-type': 'application/json'
-				},
+				headers,
 				body: JSON.stringify({
 					user_id: playerId,
 					mission_id: mission.id,
@@ -452,46 +508,6 @@
 		}
 	}
 
-	async function generateChallengeLink() {
-		if (isGeneratingLink || !result) return;
-		isGeneratingLink = true;
-		shareLinkText = 'Generating...';
-
-		try {
-			const res = await fetch('/api/challenges/create', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					user_id: playerId,
-					mission_id: mission.id,
-					xp_earned: result.xpEarned,
-					time_taken: MISSION_DURATION_SECONDS - result.secondsRemaining,
-					wrong_taps: result.wrongTaps,
-					clues_found: result.foundCount,
-					clues_total: mission.clues.length,
-					outcome: result.outcome
-				})
-			});
-
-			if (res.ok) {
-				const { code } = await res.json() as { code: string };
-				const duelUrl = `${window.location.origin}/duel/${code}`;
-				await navigator.clipboard.writeText(duelUrl);
-				shareLinkText = 'Duel Link Copied!';
-				setTimeout(() => { shareLinkText = 'Challenge a Friend'; }, 3000);
-			} else {
-				shareLinkText = 'Failed. Try again.';
-				setTimeout(() => { shareLinkText = 'Challenge a Friend'; }, 3000);
-			}
-		} catch (e) {
-			console.error('Failed to generate challenge link', e);
-			shareLinkText = 'Error';
-			setTimeout(() => { shareLinkText = 'Challenge a Friend'; }, 3000);
-		} finally {
-			isGeneratingLink = false;
-		}
-	}
-
 	async function handleSegmentTap(segment: (typeof segments)[number]) {
 		if (missionState !== 'active' || paused || result) {
 			return;
@@ -507,7 +523,7 @@
 			bestCombo = Math.max(bestCombo, comboChain);
 			pulseFeedback('correct', 'Nice catch', segment.clue.explanation);
 
-			if (foundIds.length + 1 === mission.clues.length) {
+			if (foundIds.length === mission.clues.length) {
 				finishMission('success');
 			}
 
@@ -526,8 +542,23 @@
 		// Await server confirmation of lives decrement
 		await persistLives(nextLives);
 
-		if (livesState.lives <= 0) {
+		if (nextLives.lives <= 0) {
 			finishMission('failed');
+		}
+	}
+
+	function handleFallbackClueTap(clueId: number, explanation: string) {
+		if (missionState !== 'active' || paused || result || foundIds.includes(clueId)) {
+			return;
+		}
+
+		foundIds = [...foundIds, clueId];
+		comboChain += 1;
+		bestCombo = Math.max(bestCombo, comboChain);
+		pulseFeedback('correct', 'Signal locked', explanation);
+
+		if (foundIds.length === mission.clues.length) {
+			finishMission('success');
 		}
 	}
 
@@ -551,6 +582,9 @@
 		wrongTaps = 0;
 		comboChain = 0;
 		bestCombo = 0;
+		verdictChoice = null;
+		verdictCorrect = null;
+		verdictProcessing = false;
 		secondsRemaining = MISSION_DURATION_SECONDS;
 		paused = false;
 		result = null;
@@ -569,7 +603,7 @@
 		feedbackTitle = livesState.lives > 0 ? 'Mission ready' : 'No shields available';
 		feedbackBody =
 			livesState.lives > 0
-				? 'Read the briefing, then start the round when you are ready.'
+				? 'Read the case, make your scam or safe call, and then lock the red flags.'
 				: 'Wait for a shield to recharge before starting a new round.';
 		missionState = 'ready';
 	}
@@ -594,6 +628,23 @@
 		playerId = getOrCreatePlayerId(localStorage.getItem(PLAYER_ID_STORAGE_KEY));
 		localStorage.setItem(PLAYER_ID_STORAGE_KEY, playerId);
 
+		// Acquire auth token for authenticated API calls
+		void (async () => {
+			try {
+				const tokenRes = await fetch('/api/user/token', {
+					method: 'POST',
+					headers: { 'content-type': 'application/json' },
+					body: JSON.stringify({ user_id: playerId })
+				});
+				if (tokenRes.ok) {
+					const { token } = (await tokenRes.json()) as { token: string };
+					playerToken = token;
+				}
+			} catch (err) {
+				console.warn('[GameplayEngine] Token acquisition failed:', err);
+			}
+		})();
+
 		// Load lives from server (source of truth)
 		void (async () => {
 			try {
@@ -610,7 +661,7 @@
 			feedbackTitle = livesState.lives > 0 ? 'Mission briefing' : 'No shields available';
 			feedbackBody =
 				livesState.lives > 0
-					? 'Read the setup, check your shields, then hit start when you are ready to defend the player.'
+					? 'Read the setup, decide scam or safe, then find the warning signs before time runs out.'
 					: 'You are out of shields. Wait for one to recharge or come back later.';
 		})();
 
@@ -674,6 +725,25 @@
 			<p>{completionPercent}% cleared</p>
 		</article>
 		<article>
+			<span class="label">Judgment</span>
+			<strong>
+				{missionState === 'ready'
+					? 'Pending'
+					: verdictChoice === null
+						? 'Choose'
+						: verdictCorrect
+							? 'Scam'
+							: 'Missed'}
+			</strong>
+			<p>
+				{verdictChoice === null
+					? 'Call the message before clue hunting.'
+					: verdictCorrect
+						? 'Correct first read.'
+						: 'Wrong call cost one shield.'}
+			</p>
+		</article>
+		<article>
 			<span class="label">Combo boost</span>
 			<strong>{Math.min(1 + streakDays * 0.1, 2).toFixed(1)}x</strong>
 			<p>{streakDays} day streak applied</p>
@@ -730,7 +800,7 @@
 					<div class="briefing-card__header">
 						<div>
 							<p class="label">Mission briefing</p>
-							<h3>Protect the player from a {missionLabel} trap</h3>
+							<h3>Decide if this {missionLabel} message is a scam.</h3>
 						</div>
 						<span>{mission.simulationType.replaceAll('_', ' ')}</span>
 					</div>
@@ -740,8 +810,12 @@
 							<strong>{mission.sender}</strong>
 						</article>
 						<article>
-							<span class="label">Red flags hidden</span>
-							<strong>{mission.clues.length}</strong>
+							<span class="label">Step 1</span>
+							<strong>Judge scam or safe</strong>
+						</article>
+						<article>
+							<span class="label">Step 2</span>
+							<strong>Find {mission.clues.length} red flags</strong>
 						</article>
 						<article>
 							<span class="label">Round stakes</span>
@@ -754,7 +828,23 @@
 							Skip mission
 						</button>
 						<button type="button" class="primary-action briefing-card__action" onclick={beginMission}>
-							Start mission
+							Start round
+						</button>
+					</div>
+				</div>
+			{/if}
+
+			{#if missionState === 'judging' && !result}
+				<div class="verdict-panel">
+					<p class="label">Step 1: Quick judgment</p>
+					<h3>{verdictProcessing ? 'Processing...' : 'Is this message a scam or safe?'}</h3>
+					<p>Make the first call before the clue timer starts. A wrong judgment costs one shield.</p>
+					<div class="verdict-panel__actions">
+						<button type="button" class="verdict verdict--danger" disabled={verdictProcessing || verdictChoice !== null} onclick={() => resolveVerdict('scam')}>
+							Scam
+						</button>
+						<button type="button" class="verdict" disabled={verdictProcessing || verdictChoice !== null} onclick={() => resolveVerdict('safe')}>
+							Safe
 						</button>
 					</div>
 				</div>
@@ -778,6 +868,30 @@
 					{/if}
 				{/each}
 			</div>
+
+			{#if fallbackClues.length > 0}
+				<div class="fallback-clues">
+					<div class="fallback-clues__header">
+						<p class="label">Backup clue targets</p>
+						<p>Some signals could not be mapped directly into the message. Lock them here so the round remains playable.</p>
+					</div>
+
+					<div class="fallback-clues__grid">
+						{#each fallbackClues as clue}
+							<button
+								type="button"
+								class:found={foundIds.includes(clue.id)}
+								class="fallback-clue"
+								disabled={missionState !== 'active' || paused || foundIds.includes(clue.id)}
+								onclick={() => handleFallbackClueTap(clue.id, clue.explanation)}
+							>
+								<span>{clue.type.replaceAll('_', ' ')}</span>
+								<strong>{clue.triggerText}</strong>
+							</button>
+						{/each}
+					</div>
+				</div>
+			{/if}
 		</section>
 
 		<aside class="intel-rail">
@@ -952,9 +1066,6 @@
 			<div class="result-actions">
 				<button type="button" class="primary-action" onclick={restartMission}>Play again</button>
 				<a class="ghost-link" href="/play">New round</a>
-				<button type="button" class="ghost-button" class:share-loading={isGeneratingLink} onclick={generateChallengeLink}>
-					{shareLinkText}
-				</button>
 			</div>
 		</section>
 	{/if}
@@ -1367,6 +1478,56 @@
 		margin-top: 1rem;
 	}
 
+	.verdict-panel {
+		margin-top: 1rem;
+		padding: 1rem;
+		border: 1px solid rgba(245, 196, 108, 0.22);
+		border-radius: 1rem;
+		background:
+			radial-gradient(circle at top right, rgba(245, 196, 108, 0.08), transparent 22%),
+			rgba(255, 255, 255, 0.03);
+	}
+
+	.verdict-panel h3 {
+		margin: 0.45rem 0 0;
+		font-family: var(--font-display);
+		font-size: clamp(1.9rem, 4vw, 2.6rem);
+		font-weight: 500;
+		line-height: 0.98;
+	}
+
+	.verdict-panel p:last-of-type {
+		margin: 0.75rem 0 0;
+		color: var(--muted);
+		line-height: 1.7;
+	}
+
+	.verdict-panel__actions {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 0.8rem;
+		margin-top: 1rem;
+	}
+
+	.verdict {
+		min-height: 3.2rem;
+		padding: 0 1rem;
+		border: 1px solid rgba(130, 191, 255, 0.14);
+		border-radius: 0.95rem;
+		background: rgba(255, 255, 255, 0.03);
+		color: var(--text);
+		font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+		font-size: 0.72rem;
+		letter-spacing: 0.16em;
+		text-transform: uppercase;
+		cursor: pointer;
+	}
+
+	.verdict--danger {
+		background: linear-gradient(135deg, rgba(255, 107, 107, 0.2), rgba(245, 196, 108, 0.18));
+		border-color: rgba(255, 107, 107, 0.32);
+	}
+
 	.message-card {
 		margin-top: 1rem;
 		padding: 1.1rem;
@@ -1377,6 +1538,61 @@
 		white-space: pre-wrap;
 		font-size: clamp(1.02rem, 1.1vw, 1.14rem);
 		box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+	}
+
+	.fallback-clues {
+		margin-top: 1rem;
+		padding: 1rem;
+		border: 1px solid rgba(130, 191, 255, 0.12);
+		border-radius: 1rem;
+		background: rgba(255, 255, 255, 0.025);
+	}
+
+	.fallback-clues__header p:last-child {
+		margin: 0.45rem 0 0;
+		color: var(--muted);
+		line-height: 1.6;
+	}
+
+	.fallback-clues__grid {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 0.75rem;
+		margin-top: 1rem;
+	}
+
+	.fallback-clue {
+		padding: 0.9rem;
+		border: 1px solid rgba(130, 191, 255, 0.12);
+		border-radius: 0.9rem;
+		background: rgba(255, 255, 255, 0.03);
+		color: var(--text);
+		text-align: left;
+		cursor: pointer;
+	}
+
+	.fallback-clue span,
+	.fallback-clue strong {
+		display: block;
+	}
+
+	.fallback-clue span {
+		font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+		font-size: 0.62rem;
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
+		color: var(--muted);
+	}
+
+	.fallback-clue strong {
+		margin-top: 0.55rem;
+		font-size: 1rem;
+		line-height: 1.45;
+	}
+
+	.fallback-clue.found {
+		border-color: rgba(125, 242, 201, 0.28);
+		background: rgba(125, 242, 201, 0.08);
 	}
 
 	.message-card.paused {
@@ -1732,6 +1948,131 @@
 
 		.mission-strip__controls {
 			justify-items: start;
+		}
+	}
+
+	@media (max-width: 720px) {
+		.gameplay-shell {
+			gap: 0.85rem;
+		}
+
+		.label,
+		.message-meta span,
+		.clue-board strong,
+		.result-clues span {
+			font-size: 0.62rem;
+			letter-spacing: 0.12em;
+		}
+
+		.mission-strip,
+		.message-slate,
+		.intel-rail section,
+		.result-screen {
+			padding: 1rem;
+			border-radius: 0.95rem;
+		}
+
+		.tutorial-strip {
+			padding: 0.95rem;
+			border-radius: 0.95rem;
+		}
+
+		.mission-strip h1 {
+			font-size: clamp(2rem, 9vw, 3rem);
+		}
+
+		.tutorial-strip__hero h2,
+		.message-slate h2,
+		.intel-rail h3,
+		.result-screen h2,
+		.result-clues h3 {
+			font-size: clamp(1.7rem, 7vw, 2.35rem);
+		}
+
+		.ghost-link,
+		.ghost-button,
+		.primary-action {
+			width: 100%;
+			min-height: 2.85rem;
+			font-size: 0.66rem;
+		}
+
+		.status-grid {
+			grid-template-columns: 1fr 1fr;
+			gap: 0.7rem;
+		}
+
+		.status-grid article,
+		.result-grid article,
+		.tutorial-strip__steps article,
+		.briefing-card__grid article,
+		.clue-board article,
+		.result-clues article,
+		.ai-feedback-card,
+		.badge-card,
+		.rank-up-banner {
+			padding: 0.85rem;
+		}
+
+		.status-grid strong,
+		.result-grid h3,
+		.result-screen__hero strong {
+			font-size: 1.75rem;
+		}
+
+		.message-card {
+			padding: 0.9rem;
+			font-size: 0.98rem;
+			line-height: 1.8;
+		}
+
+		.message-token {
+			padding: 0.16rem 0.18rem;
+			border-radius: 0.36rem;
+		}
+
+		.briefing-card {
+			padding: 0.9rem;
+		}
+
+		.briefing-card__swipe-hint,
+		.sync-metrics {
+			gap: 0.45rem;
+		}
+
+		.fallback-clues__grid {
+			grid-template-columns: 1fr;
+		}
+
+		.verdict-panel__actions {
+			grid-template-columns: 1fr;
+		}
+
+		.result-actions {
+			flex-direction: column;
+		}
+	}
+
+	@media (max-width: 480px) {
+		.status-grid {
+			grid-template-columns: 1fr;
+		}
+
+		.message-meta {
+			justify-content: start;
+		}
+
+		.tutorial-strip__steps span {
+			width: 1.75rem;
+			height: 1.75rem;
+			font-size: 0.74rem;
+		}
+
+		.ai-feedback-card__header,
+		.result-clues article div,
+		.briefing-card__swipe-hint {
+			flex-direction: column;
+			align-items: flex-start;
 		}
 	}
 </style>

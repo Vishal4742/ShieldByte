@@ -614,6 +614,82 @@ export function reconcileClassificationResult(params: {
 	const { result, analysis } = params;
 	const categoryHint = analysis.categoryHint;
 
+	// ── Category-confusion disambiguation ──
+	// These rules override the AI when strong counter-signals for a
+	// different category are present in the text.  Each rule targets
+	// a specific confusion pair observed in labeled eval data.
+	const scores = analysis.categoryScores;
+	const keywords = analysis.matchedKeywords.map((k) => k.toLowerCase());
+
+	// 1. investment_fraud → customer_support_scam
+	//    When remote-access / helpline keywords dominate, it's support scam.
+	if (
+		result.fraud_type === 'investment_fraud' &&
+		(scores.customer_support_scam ?? 0) > (scores.investment_fraud ?? 0) &&
+		(keywords.includes('remote access') ||
+			keywords.includes('anydesk') ||
+			keywords.includes('teamviewer') ||
+			keywords.includes('helpline') ||
+			keywords.includes('customer care'))
+	) {
+		return {
+			...result,
+			fraud_type: 'customer_support_scam',
+			channel: chooseFallbackChannel(result.channel, 'customer_support_scam', analysis)
+		};
+	}
+
+	// 2. KYC_fraud → UPI_fraud
+	//    When collect-request / QR code signals are dominant, it's UPI.
+	if (
+		result.fraud_type === 'KYC_fraud' &&
+		(scores.UPI_fraud ?? 0) > (scores.KYC_fraud ?? 0) &&
+		(keywords.includes('collect request') ||
+			keywords.includes('qr code') ||
+			keywords.includes('scan and pay') ||
+			keywords.includes('request money'))
+	) {
+		return {
+			...result,
+			fraud_type: 'UPI_fraud',
+			channel: chooseFallbackChannel(result.channel, 'UPI_fraud', analysis)
+		};
+	}
+
+	// 3. customer_support_scam → KYC_fraud
+	//    When account-block / KYC-update signals dominate.
+	if (
+		result.fraud_type === 'customer_support_scam' &&
+		(scores.KYC_fraud ?? 0) > (scores.customer_support_scam ?? 0) + 2 &&
+		(keywords.includes('kyc update') ||
+			keywords.includes('account blocked') ||
+			keywords.includes('pan') ||
+			keywords.includes('aadhaar'))
+	) {
+		return {
+			...result,
+			fraud_type: 'KYC_fraud',
+			channel: chooseFallbackChannel(result.channel, 'KYC_fraud', analysis)
+		};
+	}
+
+	// 4. job_scam → lottery_fraud
+	//    When prize / lucky-draw signals dominate over job signals.
+	if (
+		result.fraud_type === 'job_scam' &&
+		(scores.lottery_fraud ?? 0) > (scores.job_scam ?? 0) + 1 &&
+		(keywords.includes('prize') ||
+			keywords.includes('lucky draw') ||
+			keywords.includes('you have won'))
+	) {
+		return {
+			...result,
+			fraud_type: 'lottery_fraud',
+			channel: chooseFallbackChannel(result.channel, 'lottery_fraud', analysis)
+		};
+	}
+
+	// ── Original heuristic-hint reconciliation ──
 	if (!categoryHint) {
 		return result;
 	}

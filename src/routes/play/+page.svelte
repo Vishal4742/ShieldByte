@@ -25,12 +25,12 @@
 
 	<header class="play-head">
 		<div>
-			<p>ShieldByte</p>
-			<h1>Mission engine</h1>
+			<p>ShieldByte Academy</p>
+			<h1>Scam Hunt</h1>
 		</div>
 		<nav>
 			<a href="/">Home</a>
-			<a href="/#feed">Cases</a>
+			<a href="/#feed">Practice Cases</a>
 		</nav>
 	</header>
 
